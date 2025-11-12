@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Guard Scheduling</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .shift-info {
+            font-size: 18px;
+            opacity: 0.95;
+        }
+
+        .controls {
+            padding: 25px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .date-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .date-selector input {
+            padding: 10px 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .schedule-grid {
+            padding: 30px;
+        }
+
+        .week-view {
+            display: grid;
+            grid-template-columns: 120px repeat(7, 1fr);
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .day-header {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .post-label {
+            background: #495057;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        .schedule-cell {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 10px;
+            min-height: 80px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .schedule-cell:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .schedule-cell.assigned {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+
+        .guard-name {
+            font-weight: 600;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .guards-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .guards-panel h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+
+        .guards-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .guard-badge {
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .guard-badge:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .guard-badge.selected {
+            background: #667eea;
+            color: white;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-content h3 {
+            margin-bottom: 20px;
+            color: #495057;
+        }
+
+        .guard-input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .conflict-warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 5px;
+            font-size: 12px;
+        }
+
+        .login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .login-box h2 {
+            text-align: center;
+            color: #495057;
+            margin-bottom: 30px;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .login-input {
+            padding: 12px 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-size: 14px;
+            text-align: center;
+            min-height: 20px;
+        }
+
+        .user-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-info strong {
+            color: #1976d2;
+        }
+
+        .admin-only {
+            display: none;
+        }
+
+        .admin-only.visible {
+            display: inline-block;
+        }
+
+        .read-only {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .vacation-cell {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%) !important;
+            color: white;
+            border-color: #ff6b6b !important;
+        }
+
+        .vacation-badge {
+            background: #ff6b6b;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid #ff6b6b;
+        }
+
+        .vacation-badge:hover {
+            background: #ee5a6f;
+            transform: translateY(-2px);
+        }
+
+        .vacation-badge.selected {
+            background: #c92a2a;
+            border-color: #c92a2a;
+        }
+
+        .holiday-cell {
+            background: linear-gradient(135deg, #ffd43b 0%, #fab005 100%) !important;
+            color: #212529;
+            border-color: #ffd43b !important;
+            font-weight: 700;
+        }
+
+        .holiday-day-item {
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .holiday-day-item:hover {
+            border-color: #ffd43b;
+            background: #fff9db;
+        }
+
+        .holiday-day-item.has-holiday {
+            background: #fff3bf;
+            border-color: #ffd43b;
+        }
+
+        .holiday-input {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #dee2e6;
+            border-radius: 4px;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-screen" id="loginScreen">
+        <div class="login-box">
+            <h2>🛡️ Security Scheduling Login</h2>
+            <div class="login-form">
+                <select id="userSelect" class="login-input">
+                    <option value="">Select User...</option>
+                </select>
+                <input type="password" id="passwordInput" class="login-input" placeholder="Password" onkeypress="if(event.key==='Enter') login()">
+                <button class="btn btn-primary" onclick="login()">Login</button>
+                <div id="loginError" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="mainApp" style="display: none;">
+        <div class="header">
+            <h1>🛡️ Security Guard Scheduling</h1>
+            <div class="shift-info">Shift Time: 08:45 - 17:15 | 6 Posts | 7 Guards</div>
+        </div>
+
+        <div class="user-info">
+            <div>
+                Logged in as: <strong id="currentUserDisplay"></strong>
+                <span id="roleDisplay"></span>
+            </div>
+            <button class="btn btn-secondary" onclick="logout()">Logout</button>
+        </div>
+
+        <div class="controls">
+            <div class="date-selector">
+                <label>Week Starting:</label>
+                <input type="date" id="weekStart">
+            </div>
+            <button class="btn btn-primary" onclick="loadWeek()">Load Week</button>
+            <button class="btn btn-secondary" onclick="previousWeek()">← Previous Week</button>
+            <button class="btn btn-secondary" onclick="nextWeek()">Next Week →</button>
+            <button class="btn btn-success admin-only" onclick="autoSchedule()">Auto Schedule Week</button>
+            <button class="btn btn-secondary admin-only" onclick="clearWeek()">Clear Week</button>
+            <button class="btn btn-secondary admin-only" onclick="showGuardManager()">Manage Guards</button>
+            <button class="btn btn-secondary admin-only" onclick="showPostManager()">Manage Posts</button>
+            <button class="btn btn-secondary admin-only" onclick="showHolidayManager()">Manage Holidays</button>
+        </div>
+
+        <div class="schedule-grid">
+            <div class="guards-panel">
+                <h3>Available Posts (Click to Select)</h3>
+                <div class="guards-list" id="guardsList"></div>
+            </div>
+
+            <div id="scheduleView"></div>
+
+            <div class="stats" id="statsView"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="guardModal">
+        <div class="modal-content">
+            <h3>Manage Guards</h3>
+            <div id="guardInputs"></div>
+            <button class="btn btn-primary" onclick="saveGuards()">Save Guards</button>
+            <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+
+    <div class="modal" id="postModal">
+        <div class="modal-content">
+            <h3>Manage Posts</h3>
+            <div id="postInputs"></div>
+            <button class="btn btn-primary" onclick="savePosts()">Save Posts</button>
+            <button class="btn btn-secondary" onclick="closePostModal()">Close</button>
+        </div>
+    </div>
+
+    <div class="modal" id="holidayModal">
+        <div class="modal-content">
+            <h3>Manage Holidays for This Week</h3>
+            <p style="color: #6c757d; margin-bottom: 20px;">Click on a day to add or remove a holiday. Holidays block all scheduling for that day.</p>
+            <div id="holidayInputs"></div>
+            <button class="btn btn-secondary" onclick="closeHolidayModal()">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const DEFAULT_POSTS = ['Post 1', 'Post 2', 'Post 3', 'Post 4', 'Post 5', 'Post 6'];
+        const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        
+        let POSTS = [...DEFAULT_POSTS];
+        let guards = ['Guard A', 'Guard B', 'Guard C', 'Guard D', 'Guard E', 'Guard F', 'Guard G'];
+        let schedule = {};
+        let vacations = {}; // Format: { 'Guard A_0': true, 'Guard B_3': true } where index is day
+        let holidays = {}; // Format: { '0': 'New Year', '3': 'Thanksgiving' } where index is day
+        let selectedPost = null;
+        let currentWeekStart = null;
+        let currentUser = null;
+        let userRole = null;
+
+        // User credentials - in production, this would be server-side
+        let users = {
+            'admin': { password: 'admin123', role: 'admin', displayName: 'Administrator', preferredPost: '' },
+            'Guard A': { password: 'pass1', role: 'guard', displayName: 'Guard A', preferredPost: '' },
+            'Guard B': { password: 'pass2', role: 'guard', displayName: 'Guard B', preferredPost: '' },
+            'Guard C': { password: 'pass3', role: 'guard', displayName: 'Guard C', preferredPost: '' },
+            'Guard D': { password: 'pass4', role: 'guard', displayName: 'Guard D', preferredPost: '' },
+            'Guard E': { password: 'pass5', role: 'guard', displayName: 'Guard E', preferredPost: '' },
+            'Guard F': { password: 'pass6', role: 'guard', displayName: 'Guard F', preferredPost: '' },
+            'Guard G': { password: 'pass7', role: 'guard', displayName: 'Guard G', preferredPost: '' }
+        };
+
+        function initializeApp() {
+            // Populate user dropdown
+            const userSelect = document.getElementById('userSelect');
+            userSelect.innerHTML = '<option value="">Select User...</option>' +
+                Object.keys(users).map(username => 
+                    `<option value="${username}">${users[username].displayName}</option>`
+                ).join('');
+
+            // Check for existing session
+            const savedUser = sessionStorage.getItem('currentUser');
+            if (savedUser && users[savedUser]) {
+                currentUser = savedUser;
+                userRole = users[savedUser].role;
+                showApp();
+            }
+        }
+
+        function login() {
+            const username = document.getElementById('userSelect').value;
+            const password = document.getElementById('passwordInput').value;
+            const errorDiv = document.getElementById('loginError');
+
+            if (!username) {
+                errorDiv.textContent = 'Please select a user';
+                return;
+            }
+
+            if (!password) {
+                errorDiv.textContent = 'Please enter a password';
+                return;
+            }
+
+            if (users[username] && users[username].password === password) {
+                currentUser = username;
+                userRole = users[username].role;
+                sessionStorage.setItem('currentUser', username);
+                errorDiv.textContent = '';
+                showApp();
+            } else {
+                errorDiv.textContent = 'Invalid password';
+            }
+        }
+
+        function logout() {
+            sessionStorage.removeItem('currentUser');
+            currentUser = null;
+            userRole = null;
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('userSelect').value = '';
+        }
+
+        function showApp() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            document.getElementById('currentUserDisplay').textContent = users[currentUser].displayName;
+            document.getElementById('roleDisplay').textContent = userRole === 'admin' ? '(Administrator)' : '(Guard)';
+
+            // Show/hide admin-only features
+            const adminButtons = document.querySelectorAll('.admin-only');
+            adminButtons.forEach(btn => {
+                if (userRole === 'admin') {
+                    btn.classList.add('visible');
+                } else {
+                    btn.classList.remove('visible');
+                }
+            });
+
+            // Set to current week's Monday
+            const today = new Date();
+            const monday = new Date(today);
+            monday.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1));
+            currentWeekStart = monday.toISOString().split('T')[0];
+            document.getElementById('weekStart').value = currentWeekStart;
+            
+            loadSchedule();
+            renderGuards();
+            renderSchedule();
+            updateStats();
+        }
+
+        function loadSchedule() {
+            const saved = localStorage.getItem(`schedule_${currentWeekStart}`);
+            if (saved) {
+                schedule = JSON.parse(saved);
+            } else {
+                schedule = {};
+            }
+            
+            const savedVacations = localStorage.getItem(`vacations_${currentWeekStart}`);
+            if (savedVacations) {
+                vacations = JSON.parse(savedVacations);
+            } else {
+                vacations = {};
+            }
+            
+            const savedHolidays = localStorage.getItem(`holidays_${currentWeekStart}`);
+            if (savedHolidays) {
+                holidays = JSON.parse(savedHolidays);
+            } else {
+                holidays = {};
+            }
+            
+            const savedPosts = localStorage.getItem('posts');
+            if (savedPosts) {
+                POSTS = JSON.parse(savedPosts);
+            }
+        }
+
+        function saveSchedule() {
+            localStorage.setItem(`schedule_${currentWeekStart}`, JSON.stringify(schedule));
+            localStorage.setItem(`vacations_${currentWeekStart}`, JSON.stringify(vacations));
+            localStorage.setItem(`holidays_${currentWeekStart}`, JSON.stringify(holidays));
+        }
+
+        function renderGuards() {
+            const guardsList = document.getElementById('guardsList');
+            
+            // Show posts for selection
+            let html = POSTS.map(post => 
+                `<div class="guard-badge ${selectedPost === post ? 'selected' : ''}" 
+                      onclick="selectPost('${post}')">
+                    ${post}
+                </div>`
+            ).join('');
+            
+            // Add vacation option for guards, or always for admin
+            if (userRole === 'guard' || userRole === 'admin') {
+                html += `<div class="vacation-badge ${selectedPost === 'VACATION' ? 'selected' : ''}" 
+                          onclick="selectPost('VACATION')">
+                    🏖️ Vacation
+                </div>`;
+            }
+            
+            guardsList.innerHTML = html;
+        }
+
+        function selectPost(post) {
+            selectedPost = selectedPost === post ? null : post;
+            renderGuards();
+        }
+
+        function renderSchedule() {
+            const view = document.getElementById('scheduleView');
+            
+            let html = '<div class="week-view">';
+            
+            // Header row
+            html += '<div class="post-label">Guards</div>';
+            DAYS.forEach((day, dayIndex) => {
+                const holidayName = holidays[dayIndex];
+                const headerText = holidayName ? `${day}<br><small>🎉 ${holidayName}</small>` : day;
+                html += `<div class="day-header ${holidayName ? 'holiday-cell' : ''}">${headerText}</div>`;
+            });
+
+            // Guards rows - filter based on role
+            const displayGuards = userRole === 'admin' ? guards : [currentUser];
+            
+            displayGuards.forEach(guard => {
+                const guardUser = users[guard];
+                const preferredPost = guardUser ? guardUser.preferredPost : '';
+                const guardLabel = preferredPost ? `${guard}<br><small style="font-size: 11px;">⭐ ${preferredPost}</small>` : guard;
+                
+                html += `<div class="post-label">${guardLabel}</div>`;
+                DAYS.forEach((day, dayIndex) => {
+                    const isHoliday = holidays[dayIndex];
+                    const vacationKey = `${guard}_${dayIndex}`;
+                    const isOnVacation = vacations[vacationKey];
+                    const assignedPost = isOnVacation ? null : getGuardAssignment(guard, dayIndex);
+                    const conflict = !isOnVacation && assignedPost && isGuardConflict(guard, dayIndex);
+                    const isCurrentGuard = guard === currentUser;
+                    const canEdit = !isHoliday && (userRole === 'admin' || isCurrentGuard);
+                    
+                    // Check if assigned to preferred post
+                    const isPreferredPost = assignedPost && preferredPost && assignedPost === preferredPost;
+                    
+                    let cellClass = '';
+                    let cellContent = '';
+                    
+                    if (isHoliday) {
+                        cellClass = 'holiday-cell read-only';
+                        cellContent = `<div class="guard-name">🎉 HOLIDAY</div>`;
+                    } else if (isOnVacation) {
+                        cellClass = 'vacation-cell';
+                        cellContent = `<div class="guard-name">🏖️ VACATION</div>`;
+                    } else if (assignedPost) {
+                        cellClass = 'assigned';
+                        cellContent = `<div class="guard-name">${assignedPost}${isPreferredPost ? ' ⭐' : ''}</div>`;
+                    }
+                    
+                    html += `<div class="schedule-cell ${cellClass} ${!canEdit ? 'read-only' : ''}" 
+                                  onclick="assignPost('${guard}', ${dayIndex})">
+                        ${cellContent}
+                        ${conflict ? '<div class="conflict-warning">⚠️ Conflict</div>' : ''}
+                    </div>`;
+                });
+            });
+
+            html += '</div>';
+            view.innerHTML = html;
+        }
+
+        function getGuardAssignment(guard, dayIndex) {
+            // Find which post this guard is assigned to on this day
+            for (let post of POSTS) {
+                const key = `${post}_${dayIndex}`;
+                if (schedule[key] === guard) {
+                    return post;
+                }
+            }
+            return null;
+        }
+
+        function isGuardConflict(guard, dayIndex) {
+            // Check if guard is assigned to multiple posts on same day
+            let count = 0;
+            POSTS.forEach(post => {
+                const key = `${post}_${dayIndex}`;
+                if (schedule[key] === guard) {
+                    count++;
+                }
+            });
+            return count > 1;
+        }
+
+        function assignPost(guard, dayIndex) {
+            // Check if day is a holiday - block all assignments
+            if (holidays[dayIndex]) {
+                if (userRole === 'admin') {
+                    alert('This day is marked as a holiday. Remove the holiday from Manage Holidays to schedule on this day.');
+                } else {
+                    alert('This day is a holiday - no scheduling available.');
+                }
+                return;
+            }
+
+            // Check permissions - only admin or the guard themselves can edit
+            if (userRole !== 'admin' && guard !== currentUser) {
+                alert('You can only modify your own schedule');
+                return;
+            }
+
+            const vacationKey = `${guard}_${dayIndex}`;
+
+            // Handle vacation assignment
+            if (selectedPost === 'VACATION') {
+                // Check if this guard is already on vacation
+                if (vacations[vacationKey]) {
+                    // Remove vacation
+                    delete vacations[vacationKey];
+                } else {
+                    // Check if another guard already has vacation this day (for non-admin)
+                    if (userRole === 'guard') {
+                        const otherGuardOnVacation = isAnyGuardOnVacation(dayIndex, guard);
+                        if (otherGuardOnVacation) {
+                            alert('Cannot take vacation - another guard is already on vacation this day. Please contact your administrator.');
+                            return;
+                        }
+                        
+                        const dayHasAssignments = isDayClaimedByAnyone(dayIndex);
+                        if (dayHasAssignments) {
+                            alert('Cannot take vacation - this day already has post assignments');
+                            return;
+                        }
+                    }
+                    
+                    // Set vacation and clear any post assignments for this day
+                    vacations[vacationKey] = true;
+                    POSTS.forEach(post => {
+                        const key = `${post}_${dayIndex}`;
+                        if (schedule[key] === guard) {
+                            delete schedule[key];
+                        }
+                    });
+                }
+            } else {
+                // Regular post assignment
+                
+                // Check if guard is on vacation for this day
+                if (vacations[vacationKey]) {
+                    alert('Cannot assign post - guard is on vacation this day');
+                    return;
+                }
+
+                if (!selectedPost) {
+                    // If no post selected, clear all assignments for this guard on this day
+                    POSTS.forEach(post => {
+                        const key = `${post}_${dayIndex}`;
+                        if (schedule[key] === guard) {
+                            delete schedule[key];
+                        }
+                    });
+                } else {
+                    // First, clear any existing assignment for this guard on this day
+                    POSTS.forEach(post => {
+                        const key = `${post}_${dayIndex}`;
+                        if (schedule[key] === guard) {
+                            delete schedule[key];
+                        }
+                    });
+                    
+                    // Then assign the guard to the selected post
+                    const key = `${selectedPost}_${dayIndex}`;
+                    schedule[key] = guard;
+                }
+            }
+            
+            saveSchedule();
+            renderSchedule();
+            updateStats();
+        }
+
+        function isAnyGuardOnVacation(dayIndex, excludeGuard) {
+            // Check if any other guard has vacation on this day
+            for (let guard of guards) {
+                if (guard === excludeGuard) continue;
+                const vacationKey = `${guard}_${dayIndex}`;
+                if (vacations[vacationKey]) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function isDayClaimedByAnyone(dayIndex) {
+            // Check if any posts have assignments on this day
+            for (let post of POSTS) {
+                const key = `${post}_${dayIndex}`;
+                if (schedule[key]) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function isConflict(guard, dayIndex, currentPost) {
+            // Check if guard is assigned to multiple posts on same day
+            let count = 0;
+            POSTS.forEach(post => {
+                const key = `${post}_${dayIndex}`;
+                if (schedule[key] === guard) {
+                    count++;
+                }
+            });
+            return count > 1;
+        }
+
+        function autoSchedule() {
+            if (userRole !== 'admin') {
+                alert('Only administrators can use auto-schedule');
+                return;
+            }
+
+            if (!confirm('This will clear the current schedule and create a new one. Continue?')) {
+                return;
+            }
+
+            schedule = {};
+            
+            // Simple round-robin scheduling
+            let guardIndex = 0;
+            
+            DAYS.forEach((day, dayIndex) => {
+                const usedGuards = new Set();
+                
+                POSTS.forEach(post => {
+                    // Find next available guard who hasn't been assigned today
+                    let attempts = 0;
+                    while (usedGuards.has(guards[guardIndex]) && attempts < guards.length) {
+                        guardIndex = (guardIndex + 1) % guards.length;
+                        attempts++;
+                    }
+                    
+                    const key = `${post}_${dayIndex}`;
+                    schedule[key] = guards[guardIndex];
+                    usedGuards.add(guards[guardIndex]);
+                    
+                    guardIndex = (guardIndex + 1) % guards.length;
+                });
+            });
+            
+            saveSchedule();
+            renderSchedule();
+            updateStats();
+        }
+
+        function clearWeek() {
+            if (userRole !== 'admin') {
+                alert('Only administrators can clear the schedule');
+                return;
+            }
+
+            if (confirm('Clear all assignments, vacations, and holidays for this week?')) {
+                schedule = {};
+                vacations = {};
+                holidays = {};
+                saveSchedule();
+                renderSchedule();
+                updateStats();
+            }
+        }
+
+        function updateStats() {
+            const stats = {};
+            const vacationStats = {};
+            const preferredStats = {};
+            
+            guards.forEach(guard => {
+                stats[guard] = 0;
+                vacationStats[guard] = 0;
+                preferredStats[guard] = 0;
+            });
+            
+            Object.entries(schedule).forEach(([key, guard]) => {
+                if (stats[guard] !== undefined) {
+                    stats[guard]++;
+                    
+                    // Check if this assignment matches preferred post
+                    const post = key.split('_')[0];
+                    const guardUser = users[guard];
+                    if (guardUser && guardUser.preferredPost === post) {
+                        preferredStats[guard]++;
+                    }
+                }
+            });
+            
+            Object.keys(vacations).forEach(key => {
+                const guard = key.split('_')[0];
+                if (vacationStats[guard] !== undefined) {
+                    vacationStats[guard]++;
+                }
+            });
+
+            const totalAssigned = Object.keys(schedule).length;
+            const totalSlots = POSTS.length * DAYS.length;
+            const totalVacations = Object.keys(vacations).length;
+            const totalHolidays = Object.keys(holidays).length;
+            const conflicts = countConflicts();
+
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="stat-value">${totalAssigned}/${totalSlots}</div>
+                    <div class="stat-label">Slots Filled</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${totalVacations}</div>
+                    <div class="stat-label">Vacation Days</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${totalHolidays}</div>
+                    <div class="stat-label">Holidays</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${conflicts}</div>
+                    <div class="stat-label">Conflicts</div>
+                </div>
+                ${guards.map(guard => {
+                    const guardUser = users[guard];
+                    const preferredPost = guardUser ? guardUser.preferredPost : '';
+                    const preferredCount = preferredStats[guard];
+                    const preferredInfo = preferredPost && preferredCount > 0 ? ` | ⭐${preferredCount}` : '';
+                    
+                    return `
+                        <div class="stat-card">
+                            <div class="stat-value">${stats[guard]} shifts / ${vacationStats[guard]} vac${preferredInfo}</div>
+                            <div class="stat-label">${guard}${preferredPost ? ` (⭐ ${preferredPost})` : ''}</div>
+                        </div>
+                    `;
+                }).join('')}
+            `;
+
+            document.getElementById('statsView').innerHTML = statsHtml;
+        }
+
+        function countConflicts() {
+            let conflicts = 0;
+            DAYS.forEach((day, dayIndex) => {
+                const guardsOnDay = {};
+                POSTS.forEach(post => {
+                    const key = `${post}_${dayIndex}`;
+                    const guard = schedule[key];
+                    if (guard) {
+                        guardsOnDay[guard] = (guardsOnDay[guard] || 0) + 1;
+                    }
+                });
+                Object.values(guardsOnDay).forEach(count => {
+                    if (count > 1) conflicts++;
+                });
+            });
+            return conflicts;
+        }
+
+        function loadWeek() {
+            currentWeekStart = document.getElementById('weekStart').value;
+            loadSchedule();
+            renderSchedule();
+            updateStats();
+        }
+
+        function previousWeek() {
+            const date = new Date(currentWeekStart);
+            date.setDate(date.getDate() - 7);
+            currentWeekStart = date.toISOString().split('T')[0];
+            document.getElementById('weekStart').value = currentWeekStart;
+            loadWeek();
+        }
+
+        function nextWeek() {
+            const date = new Date(currentWeekStart);
+            date.setDate(date.getDate() + 7);
+            currentWeekStart = date.toISOString().split('T')[0];
+            document.getElementById('weekStart').value = currentWeekStart;
+            loadWeek();
+        }
+
+        function showGuardManager() {
+            if (userRole !== 'admin') {
+                alert('Only administrators can manage guards');
+                return;
+            }
+
+            const modal = document.getElementById('guardModal');
+            const inputs = document.getElementById('guardInputs');
+            
+            let html = '<p style="margin-bottom: 15px; color: #6c757d;">Manage your security guards:</p>';
+            
+            guards.forEach((guard, index) => {
+                const guardUser = users[guard] || { password: `pass${index + 1}`, preferredPost: '' };
+                html += `
+                    <div class="guard-manager-item" data-index="${index}">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                            <div>
+                                <label style="font-size: 12px; color: #6c757d; display: block; margin-bottom: 5px;">Name</label>
+                                <input type="text" class="guard-input guard-name-input" value="${guard}" 
+                                        placeholder="Guard Name" data-index="${index}">
+                            </div>
+                            <div>
+                                <label style="font-size: 12px; color: #6c757d; display: block; margin-bottom: 5px;">Password</label>
+                                <input type="text" class="guard-input guard-password-input" value="${guardUser.password}" 
+                                        placeholder="Password" data-index="${index}">
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="font-size: 12px; color: #6c757d; display: block; margin-bottom: 5px;">Preferred Post (Optional)</label>
+                            <select class="guard-input guard-preferred-input" data-index="${index}">
+                                <option value="">No Preference</option>
+                                ${POSTS.map(post => 
+                                    `<option value="${post}" ${guardUser.preferredPost === post ? 'selected' : ''}>${post}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                        ${guards.length > 1 ? 
+                            `<button class="btn btn-secondary" onclick="removeGuard(${index})" style="width: 100%; margin-bottom: 10px;">Remove Guard</button>` 
+                            : ''}
+                        <hr style="margin: 15px 0; border: none; border-top: 1px solid #dee2e6;">
+                    </div>
+                `;
+            });
+            
+            html += '<button class="btn btn-success" onclick="addNewGuard()" style="margin-top: 10px; width: 100%;">+ Add Guard</button>';
+            
+            inputs.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function addNewGuard() {
+            const inputs = document.getElementById('guardInputs');
+            const currentGuards = guards.length;
+            
+            const newIndex = currentGuards;
+            const newLetter = String.fromCharCode(65 + (newIndex % 26));
+            const newGuardDiv = document.createElement('div');
+            newGuardDiv.className = 'guard-manager-item';
+            newGuardDiv.setAttribute('data-index', newIndex);
+            newGuardDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <div>
+                        <label style="font-size: 12px; color: #6c757d; display: block; margin-bottom: 5px;">Name</label>
+                        <input type="text" class="guard-input guard-name-input" value="Guard ${newLetter}" 
+                                placeholder="Guard Name" data-index="${newIndex}">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #6c757d; display: block; margin-bottom: 5px;">Password</label>
+                        <input type="text" class="guard-input guard-password-input" value="pass${newIndex + 1}" 
+                                placeholder="Password" data-index="${newIndex}">
+                    </div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="font-size: 12px; color: #6c757d; display: block; margin-bottom: 5px;">Preferred Post (Optional)</label>
+                    <select class="guard-input guard-preferred-input" data-index="${newIndex}">
+                        <option value="">No Preference</option>
+                        ${POSTS.map(post => `<option value="${post}">${post}</option>`).join('')}
+                    </select>
+                </div>
+                <button class="btn btn-secondary" onclick="removeGuard(${newIndex})" style="width: 100%; margin-bottom: 10px;">Remove Guard</button>
+                <hr style="margin: 15px 0; border: none; border-top: 1px solid #dee2e6;">
+            `;
+            
+            const addButton = inputs.querySelector('button[onclick="addNewGuard()"]');
+            inputs.insertBefore(newGuardDiv, addButton);
+        }
+
+        function removeGuard(index) {
+            const guardItems = document.querySelectorAll('.guard-manager-item');
+            if (guardItems.length <= 1) {
+                alert('You must have at least one guard.');
+                return;
+            }
+            
+            const guardNameInput = document.querySelector(`.guard-name-input[data-index="${index}"]`);
+            const guardName = guardNameInput ? guardNameInput.value : `Guard at index ${index}`;
+            
+            if (confirm(`Remove ${guardName}? This will clear all their assignments and delete their login.`)) {
+                guardItems[index].remove();
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('guardModal').classList.remove('active');
+        }
+
+        function saveGuards() {
+            const guardItems = document.querySelectorAll('.guard-manager-item');
+            const newGuards = [];
+            const newUsers = { 'admin': users['admin'] };
+            
+            guardItems.forEach((item, index) => {
+                const nameInput = item.querySelector('.guard-name-input');
+                const passwordInput = item.querySelector('.guard-password-input');
+                const preferredInput = item.querySelector('.guard-preferred-input');
+                
+                const guardName = nameInput ? nameInput.value.trim() : '';
+                const password = passwordInput ? passwordInput.value.trim() : `pass${index + 1}`;
+                const preferredPost = preferredInput ? preferredInput.value : '';
+                
+                if (guardName) {
+                    newGuards.push(guardName);
+                    newUsers[guardName] = {
+                        password: password || `pass${index + 1}`,
+                        role: 'guard',
+                        displayName: guardName,
+                        preferredPost: preferredPost
+                    };
+                }
+            });
+            
+            if (newGuards.length < 1) {
+                alert('Please provide at least one guard name.');
+                return;
+            }
+            
+            // Check for duplicate guard names
+            const uniqueNames = new Set(newGuards);
+            if (uniqueNames.size !== newGuards.length) {
+                alert('Guard names must be unique. Please check for duplicates.');
+                return;
+            }
+
+            // Update global variables
+            guards = newGuards;
+            users = newUsers;
+            
+            // Update login dropdown
+            const userSelect = document.getElementById('userSelect');
+            if (userSelect) {
+                userSelect.innerHTML = '<option value="">Select User...</option>' +
+                    Object.keys(users).map(username => 
+                        `<option value="${username}">${users[username].displayName}</option>`
+                    ).join('');
+            }
+            
+            renderGuards();
+            renderSchedule();
+            updateStats();
+            closeModal();
+            
+            alert('Guards updated successfully! New passwords are now active.');
+        }
+
+        function showPostManager() {
+            if (userRole !== 'admin') {
+                alert('Only administrators can manage posts');
+                return;
+            }
+
+            const modal = document.getElementById('postModal');
+            const inputs = document.getElementById('postInputs');
+            
+            inputs.innerHTML = '<p style="margin-bottom: 15px; color: #6c757d;">Add or remove posts as needed:</p>' +
+                POSTS.map((post, index) => 
+                    `<div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <input type="text" class="guard-input" value="${post}" 
+                                data-index="${index}" placeholder="Post Name" style="flex: 1;">
+                        <button class="btn btn-secondary" onclick="removePost(${index})" style="padding: 10px 15px;">Remove</button>
+                    </div>`
+                ).join('') +
+                '<button class="btn btn-success" onclick="addNewPost()" style="margin-top: 10px; width: 100%;">+ Add Post</button>';
+            
+            modal.classList.add('active');
+        }
+
+        function addNewPost() {
+            const inputs = document.getElementById('postInputs');
+            const currentPosts = Array.from(document.querySelectorAll('#postInputs input'))
+                .map(input => input.value.trim())
+                .filter(name => name);
+            
+            const newIndex = currentPosts.length;
+            const newPostDiv = document.createElement('div');
+            newPostDiv.style.cssText = 'display: flex; gap: 10px; margin-bottom: 10px;';
+            newPostDiv.innerHTML = `
+                <input type="text" class="guard-input" value="Post ${newIndex + 1}" 
+                        data-index="${newIndex}" placeholder="Post Name" style="flex: 1;">
+                <button class="btn btn-secondary" onclick="removePost(${newIndex})" style="padding: 10px 15px;">Remove</button>
+            `;
+            
+            const addButton = inputs.querySelector('button[onclick="addNewPost()"]');
+            inputs.insertBefore(newPostDiv, addButton);
+        }
+
+        function removePost(index) {
+            if (confirm('Remove this post? This will clear all assignments for this post.')) {
+                const inputs = document.querySelectorAll('#postInputs input');
+                inputs[index].closest('div').remove();
+            }
+        }
+
+        function savePosts() {
+            const inputs = document.querySelectorAll('#postInputs input');
+            const newPosts = Array.from(inputs)
+                .map(input => input.value.trim())
+                .filter(name => name);
+            
+            if (newPosts.length === 0) {
+                alert('Please provide at least one post.');
+                return;
+            }
+
+            POSTS = newPosts;
+            localStorage.setItem('posts', JSON.stringify(POSTS));
+            
+            renderGuards();
+            renderSchedule();
+            updateStats();
+            closePostModal();
+        }
+
+        function closePostModal() {
+            document.getElementById('postModal').classList.remove('active');
+        }
+
+        function showHolidayManager() {
+            if (userRole !== 'admin') {
+                alert('Only administrators can manage holidays');
+                return;
+            }
+
+            const modal = document.getElementById('holidayModal');
+            const inputs = document.getElementById('holidayInputs');
+            
+            let html = '';
+            DAYS.forEach((day, index) => {
+                const hasHoliday = holidays[index];
+                html += `
+                    <div class="holiday-day-item ${hasHoliday ? 'has-holiday' : ''}" onclick="toggleHoliday(${index})">
+                        <strong>${day}</strong>
+                        ${hasHoliday ? `<div style="color: #fab005; margin-top: 5px;">🎉 ${holidays[index]}</div>` : 
+                                       '<div style="color: #6c757d; margin-top: 5px;">No holiday - click to add</div>'}
+                    </div>
+                `;
+            });
+            
+            inputs.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function toggleHoliday(dayIndex) {
+            const dayName = DAYS[dayIndex];
+            
+            if (holidays[dayIndex]) {
+                // Remove holiday
+                if (confirm(`Remove holiday "${holidays[dayIndex]}" from ${dayName}?`)) {
+                    delete holidays[dayIndex];
+                    saveSchedule();
+                    showHolidayManager(); // Refresh the modal
+                    renderSchedule();
+                    updateStats();
+                }
+            } else {
+                // Add holiday
+                const holidayName = prompt(`Enter holiday name for ${dayName}:`);
+                if (holidayName && holidayName.trim()) {
+                    // Clear all assignments and vacations for this day
+                    POSTS.forEach(post => {
+                        const key = `${post}_${dayIndex}`;
+                        delete schedule[key];
+                    });
+                    
+                    guards.forEach(guard => {
+                        const vacationKey = `${guard}_${dayIndex}`;
+                        delete vacations[vacationKey];
+                    });
+                    
+                    holidays[dayIndex] = holidayName.trim();
+                    saveSchedule();
+                    showHolidayManager(); // Refresh the modal
+                    renderSchedule();
+                    updateStats();
+                }
+            }
+        }
+
+        function closeHolidayModal() {
+            document.getElementById('holidayModal').classList.remove('active');
+        }
+
+        // Initialize on load
+        initializeApp();
+    </script>
+</body>
+</html>
