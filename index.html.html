@@ -1,0 +1,2641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Guard Scheduling - Cloud Sync</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .shift-info {
+            font-size: 18px;
+            opacity: 0.95;
+        }
+
+        .sync-status {
+            display: inline-block;
+            padding: 5px 15px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .sync-status.online {
+            background: rgba(76, 175, 80, 0.3);
+        }
+
+        .controls {
+            padding: 25px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .date-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .date-selector input {
+            padding: 10px 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .schedule-grid {
+            padding: 30px;
+            overflow-x: auto;
+        }
+
+        .week-view {
+            display: grid;
+            grid-template-columns: 120px repeat(7, 1fr);
+            gap: 10px;
+            margin-bottom: 30px;
+            min-width: 900px;
+        }
+
+        @media (max-width: 900px) {
+            .schedule-grid {
+                padding: 20px 15px;
+            }
+
+            .week-view {
+                grid-template-columns: 110px repeat(7, minmax(120px, 1fr));
+                min-width: 1000px;
+            }
+
+            .day-header {
+                font-size: 14px;
+            }
+
+            .guard-name {
+                font-size: 12px;
+            }
+        }
+
+        .day-header {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-radius: 8px;
+            font-weight: 600;
+            position: relative;
+        }
+
+        .day-indicator {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .cell-indicator {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            padding: 2px 6px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 600;
+            z-index: 2;
+        }
+
+        .no-work-indicator {
+            background: rgba(220, 53, 69, 0.2);
+            border: 1px solid #dc3545;
+            color: #dc3545;
+        }
+
+        .post-label {
+            background: #495057;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+
+        .schedule-cell {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 10px;
+            min-height: 80px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .schedule-cell:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .schedule-cell.assigned {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+
+        .schedule-cell.vacation-cell {
+            background: linear-gradient(135deg, #fab005 0%, #fd7e14 100%);
+            color: white;
+            border-color: #fd7e14;
+        }
+
+        .schedule-cell.no-work-cell {
+            background: linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%);
+            color: white;
+            border-color: #c92a2a;
+        }
+
+        .schedule-cell.pending-shift {
+            background: linear-gradient(135deg, #4dabf7 0%, #1c7ed6 100%);
+            color: white;
+            border-color: #1c7ed6;
+        }
+
+        .schedule-cell.confirmed-shift {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%) !important;
+            border-color: #27ae60 !important;
+            color: white !important;
+        }
+
+        .guard-name {
+            font-weight: 600;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .guards-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .guards-panel h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+
+        .guards-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .guard-badge {
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .guard-badge:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .guard-badge.selected {
+            background: #667eea;
+            color: white;
+        }
+
+        .no-work-badge {
+            border-color: #dc3545;
+            color: #dc3545;
+        }
+
+        .no-work-badge.selected {
+            background: #dc3545;
+            color: white;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 700px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-content h3 {
+            margin-bottom: 20px;
+            color: #495057;
+        }
+
+        .guard-input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .conflict-warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 5px;
+            font-size: 12px;
+        }
+
+        .confirmation-status {
+            margin-top: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .confirmation-status.pending {
+            color: #e0a800;
+        }
+
+        .confirmation-status.awaiting {
+            color: #17a2b8;
+        }
+
+        .confirmation-status.confirmed {
+            color: #28a745;
+        }
+
+        .confirm-btn {
+            margin-top: 6px;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            width: 100%;
+        }
+
+        .login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .login-box h2 {
+            text-align: center;
+            color: #495057;
+            margin-bottom: 30px;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .login-input {
+            padding: 12px 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-size: 14px;
+            text-align: center;
+            min-height: 20px;
+        }
+
+        .user-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-info strong {
+            color: #1976d2;
+        }
+
+        .admin-only, .admin-business-only {
+            display: none;
+        }
+
+        .admin-only.visible, .admin-business-only.visible {
+            display: inline-block;
+        }
+
+        .read-only {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .vacation-cell {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%) !important;
+            color: white;
+            border-color: #ff6b6b !important;
+        }
+
+        .vacation-badge {
+            background: #ff6b6b;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid #ff6b6b;
+        }
+
+        .vacation-badge:hover {
+            background: #ee5a6f;
+            transform: translateY(-2px);
+        }
+
+        .vacation-badge.selected {
+            background: #c92a2a;
+            border-color: #c92a2a;
+        }
+
+        .holiday-cell {
+            background: linear-gradient(135deg, #ffd43b 0%, #fab005 100%) !important;
+            color: #212529;
+            border-color: #ffd43b !important;
+            font-weight: 700;
+        }
+
+        .holiday-day-item {
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .holiday-day-item:hover {
+            border-color: #ffd43b;
+            background: #fff9db;
+        }
+
+        .holiday-day-item.has-holiday {
+            background: #fff3bf;
+            border-color: #ffd43b;
+        }
+
+        .post-manager-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 2px solid #dee2e6;
+        }
+
+        .post-day-active {
+            -webkit-appearance: checkbox;
+            -moz-appearance: checkbox;
+            appearance: checkbox;
+            width: 24px !important;
+            height: 24px !important;
+            cursor: pointer !important;
+            margin: 0 !important;
+            display: inline-block !important;
+            flex-shrink: 0 !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            position: relative !important;
+        }
+
+        .day-row {
+            display: grid;
+            grid-template-columns: 110px 140px 140px 120px;
+            gap: 10px;
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+            align-items: center;
+        }
+
+        .day-row.active {
+            background: #f0f7ff;
+        }
+
+        .day-row.inactive {
+            background: #ffe0e0;
+        }
+
+        .checkbox-label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+        }
+
+        .loading-box {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 400px;
+        }
+
+        .loading-box h2 {
+            color: #495057;
+            margin-bottom: 30px;
+        }
+
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        .shift-modal-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #loadingMessage {
+            color: #495057;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-box">
+            <h2>🛡️ Security Scheduling</h2>
+            <div class="loading-spinner"></div>
+            <p id="loadingMessage">Connecting to secure schedule...</p>
+            <p style="font-size: 12px; color: #6c757d; margin-top: 10px;">Please wait while we load your data</p>
+        </div>
+    </div>
+
+    <div class="login-screen" id="loginScreen" style="display: none;">
+        <div class="login-box">
+            <h2>🛡️ Security Scheduling Login</h2>
+            <div class="login-form">
+                <select id="userSelect" class="login-input">
+                    <option value="">Select User...</option>
+                </select>
+                <input type="password" id="passwordInput" class="login-input" placeholder="Password" onkeypress="if(event.key==='Enter') login()">
+                <button class="btn btn-primary" onclick="login()">Login</button>
+                <div id="loginError" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="mainApp" style="display: none;">
+        <div class="header">
+            <h1>🛡️ Security Guard Scheduling</h1>
+            <div class="shift-info">Cloud-Synced Schedule | Real-Time Updates</div>
+            <div class="sync-status" id="syncStatus">🔄 Connecting...</div>
+        </div>
+
+        <div class="user-info">
+            <div>
+                Logged in as: <strong id="currentUserDisplay"></strong>
+                <span id="roleDisplay"></span>
+            </div>
+            <button class="btn btn-secondary" onclick="logout()">Logout</button>
+        </div>
+
+        <div class="controls">
+            <div class="date-selector">
+                <label>Week Starting:</label>
+                <input type="date" id="weekStart">
+            </div>
+            <button class="btn btn-primary" onclick="loadWeek()">Load Week</button>
+            <button class="btn btn-secondary" onclick="previousWeek()">← Previous Week</button>
+            <button class="btn btn-secondary" onclick="nextWeek()">Next Week →</button>
+            <button class="btn btn-secondary" id="clearSelfButton" style="display: none;" onclick="clearMySchedule()">Clear My Week</button>
+            <button class="btn btn-success admin-only" onclick="autoSchedule()">Auto Schedule Week</button>
+            <button class="btn btn-secondary admin-only" onclick="clearWeek()">Clear Week</button>
+            <button class="btn btn-secondary admin-only" onclick="showGuardManager()">Manage Guards</button>
+            <button class="btn btn-secondary admin-business-only" onclick="showPostManager()">Manage Posts</button>
+            <button class="btn btn-secondary admin-only" onclick="showHolidayManager()">Manage Holidays</button>
+        </div>
+
+        <div class="schedule-grid">
+            <div class="guards-panel">
+                <h3>Available Posts (Click to Select)</h3>
+                <div class="guards-list" id="guardsList"></div>
+            </div>
+
+            <div id="scheduleView"></div>
+
+            <div class="stats" id="statsView"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="guardModal">
+        <div class="modal-content">
+            <h3>Manage Guards</h3>
+            <div id="guardInputs"></div>
+            <button class="btn btn-primary" onclick="saveGuards()">Save Guards</button>
+            <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+        </div>
+    </div>
+
+    <div class="modal" id="postModal">
+        <div class="modal-content">
+            <h3>Manage Posts</h3>
+            <div id="postInputs"></div>
+            <button class="btn btn-primary" onclick="savePosts()">Save Posts</button>
+            <button class="btn btn-secondary" onclick="closePostModal()">Close</button>
+        </div>
+    </div>
+
+    <div class="modal" id="holidayModal">
+        <div class="modal-content">
+            <h3>Manage Holidays for This Week</h3>
+            <p style="color: #6c757d; margin-bottom: 20px;">Click on a day to add or remove a holiday. Holidays block all scheduling for that day.</p>
+            <div id="holidayInputs"></div>
+            <button class="btn btn-secondary" onclick="closeHolidayModal()">Close</button>
+        </div>
+    </div>
+
+    <div class="modal" id="shiftModal">
+        <div class="modal-content" id="shiftModalContent">
+            <h3 id="shiftModalTitle">Review Shift</h3>
+            <div id="shiftModalDetails" style="margin-bottom: 15px; color: #495057;"></div>
+            <div id="shiftModalStatus" class="confirmation-status" style="margin-bottom: 10px;"></div>
+            <div id="shiftModalActions" class="shift-modal-actions"></div>
+            <button class="btn btn-secondary" style="margin-top: 10px;" onclick="closeShiftModal()">Close</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        let firebaseInitAttempts = 0;
+        const MAX_INIT_ATTEMPTS = 10;
+
+        function updateSyncStatus(status = 'connecting') {
+            const statusEl = document.getElementById('syncStatus');
+            if (!statusEl) return;
+
+            const statusMap = {
+                connecting: { text: '🔄 Connecting...' , className: '' },
+                online: { text: '🟢 Online', className: 'online' },
+                offline: { text: '⚠️ Offline', className: 'offline' },
+                syncing: { text: '🔁 Syncing…', className: 'syncing' }
+            };
+
+            const nextStatus = statusMap[status] || statusMap.connecting;
+            statusEl.textContent = nextStatus.text;
+            statusEl.classList.remove('online', 'offline', 'syncing');
+            if (nextStatus.className) {
+                statusEl.classList.add(nextStatus.className);
+            }
+        }
+
+        window.updateSyncStatus = updateSyncStatus;
+        updateSyncStatus('connecting');
+
+        async function initializeFirebase() {
+            try {
+                firebaseInitAttempts++;
+                
+                // Update loading message
+                const loadingMsg = document.getElementById('loadingMessage');
+                if (loadingMsg) {
+                    loadingMsg.textContent = firebaseInitAttempts > 1 
+                        ? `Reconnecting... (Attempt ${firebaseInitAttempts}/${MAX_INIT_ATTEMPTS})`
+                        : 'Connecting to secure schedule...';
+                }
+
+                // Import Firebase modules
+                const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
+                const { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteField } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+
+                // Firebase configuration
+                const firebaseConfig = {
+                    apiKey: "AIzaSyB1k5K-J1pCt9I_ZWNDxT-3SIXK3ep7ZII",
+                    authDomain: "security-scheduler-44edb.firebaseapp.com",
+                    projectId: "security-scheduler-44edb",
+                    storageBucket: "security-scheduler-44edb.firebasestorage.app",
+                    messagingSenderId: "183492967067",
+                    appId: "1:183492967067:web:0a58426c4141c8d637643e",
+                    measurementId: "G-RSK0KWM7GR"
+                };
+
+                // Initialize Firebase
+                const app = initializeApp(firebaseConfig);
+                const db = getFirestore(app);
+
+                // Make Firebase functions available globally
+                window.db = db;
+                window.firebaseDoc = doc;
+                window.firebaseSetDoc = setDoc;
+                window.firebaseGetDoc = getDoc;
+                window.firebaseOnSnapshot = onSnapshot;
+                window.firebaseCollection = collection;
+                window.firebaseUpdateDoc = updateDoc;
+                window.firebaseDeleteField = deleteField;
+
+                console.log('Firebase initialized successfully');
+                
+                // Test connection by trying to read config
+                const configDoc = doc(db, 'config', 'settings');
+                await getDoc(configDoc);
+                
+                updateSyncStatus('online');
+                
+                // Firebase is ready, initialize the app
+                if (typeof initializeApp !== 'undefined') {
+                    window.initializeApp();
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Firebase initialization error:', error);
+                updateSyncStatus('offline');
+                
+                // Retry if we haven't exceeded max attempts
+                if (firebaseInitAttempts < MAX_INIT_ATTEMPTS) {
+                    console.log(`Retrying Firebase initialization in 3 seconds... (Attempt ${firebaseInitAttempts + 1}/${MAX_INIT_ATTEMPTS})`);
+                    setTimeout(initializeFirebase, 3000);
+                } else {
+                    // Max attempts reached
+                    const loadingMsg = document.getElementById('loadingMessage');
+                    if (loadingMsg) {
+                        loadingMsg.innerHTML = `
+                            <span style="color: #dc3545;">Unable to connect to cloud database</span><br>
+                            <small style="color: #6c757d;">Please check your internet connection and refresh the page</small><br>
+                            <button onclick="location.reload()" style="margin-top: 15px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                                Try Again
+                            </button>
+                        `;
+                    }
+                }
+                
+                return false;
+            }
+        }
+
+        // Start Firebase initialization immediately
+        initializeFirebase();
+    </script>
+
+    <script>
+        const DAYS = ['Friday', 'Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
+        const DEFAULT_HOURS_TEMPLATE = DAYS.map(day => ({
+            day,
+            startTime: '08:45',
+            endTime: day === 'Saturday' ? '14:15' : '17:15',
+            active: true
+        }));
+
+        const DEFAULT_POSTS = Array.from({ length: 6 }, (_, index) => ({
+            name: `Post ${index + 1}`,
+            hours: cloneDefaultHours(),
+            owner: 'Bank of America',
+            hiddenFromGuards: false
+        }));
+
+        const DAY_TO_INDEX = DAYS.reduce((acc, day, index) => {
+            acc[day] = index;
+            return acc;
+        }, {});
+
+        function cloneDefaultHours() {
+            return DEFAULT_HOURS_TEMPLATE.map(hours => ({ ...hours }));
+        }
+
+        function toISODate(date) {
+            const local = new Date(date);
+            if (isNaN(local.getTime())) return '';
+            local.setHours(0, 0, 0, 0);
+            const offsetAdjusted = new Date(local.getTime() - local.getTimezoneOffset() * 60000);
+            return offsetAdjusted.toISOString().split('T')[0];
+        }
+
+        function getWeekStartDate(date) {
+            const base = new Date(date);
+            if (isNaN(base.getTime())) return null;
+            base.setHours(0, 0, 0, 0);
+            const daysSinceFriday = (base.getDay() + 7 - 5) % 7;
+            base.setDate(base.getDate() - daysSinceFriday);
+            base.setHours(0, 0, 0, 0);
+            return base;
+        }
+
+        function normalizePost(rawPost) {
+            if (!rawPost) {
+                return {
+                    name: 'Unnamed Post',
+                    hours: cloneDefaultHours()
+                };
+            }
+
+            if (typeof rawPost === 'string') {
+                return {
+                    name: rawPost,
+                    hours: cloneDefaultHours(),
+                    owner: 'Bank of America',
+                    hiddenFromGuards: false
+                };
+            }
+
+            const hoursByDay = {};
+            if (Array.isArray(rawPost.hours)) {
+                rawPost.hours.forEach(entry => {
+                    if (entry && entry.day && Object.prototype.hasOwnProperty.call(DAY_TO_INDEX, entry.day)) {
+                        hoursByDay[entry.day] = entry;
+                    }
+                });
+            }
+
+            const normalizedHours = DAYS.map(day => {
+                const source = hoursByDay[day] || {};
+                return {
+                    day,
+                    startTime: source.startTime || '08:45',
+                    endTime: source.endTime || (day === 'Saturday' ? '14:15' : '17:15'),
+                    active: typeof source.active === 'boolean' ? source.active : true
+                };
+            });
+
+            return {
+                name: rawPost.name || 'Unnamed Post',
+                hours: normalizedHours,
+                owner: rawPost.owner || 'Bank of America',
+                hiddenFromGuards: typeof rawPost.hiddenFromGuards === 'boolean' ? rawPost.hiddenFromGuards : false
+            };
+        }
+
+        let POSTS = DEFAULT_POSTS.map(post => normalizePost(post));
+        let guards = []; // Will be loaded from Firebase
+        let schedule = {};
+        let scheduleConfirmations = {};
+        let vacations = {};
+        let noWorkBlocks = {};
+        let holidays = {};
+        let selectedPost = null;
+        let currentWeekStart = null;
+        let currentUser = null;
+        let userRole = null;
+        let unsubscribeSchedule = null;
+        let unsubscribeConfig = null;
+        let shiftModalContext = null;
+
+        // User credentials
+        // User credentials - defaults will be replaced by Firebase data
+        let users = {
+            'admin': { password: 'admin123', role: 'admin', displayName: 'Administrator', preferredPost: '' },
+            'Bank of America': { password: 'BofA123', role: 'business', displayName: 'Bank of America', preferredPost: '' }
+        };
+
+        async function saveToFirebase() {
+            if (!currentWeekStart || !window.db) return;
+            
+            updateSyncStatus('syncing');
+            try {
+                const weekDoc = window.firebaseDoc(window.db, 'schedules', currentWeekStart);
+                await window.firebaseSetDoc(weekDoc, {
+                    schedule,
+                    confirmations: scheduleConfirmations,
+                    vacations,
+                    noWork: noWorkBlocks,
+                    holidays,
+                    lastUpdated: new Date().toISOString()
+                });
+            } catch (error) {
+                console.error('Error saving config to Firebase:', error);
+            }
+        }
+
+        function subscribeToSchedule() {
+            if (!currentWeekStart || !window.db) return;
+            
+            // Unsubscribe from previous week if exists
+            if (unsubscribeSchedule) {
+                unsubscribeSchedule();
+            }
+            
+            // Reset local state while the new week loads
+            schedule = {};
+            scheduleConfirmations = {};
+            vacations = {};
+            noWorkBlocks = {};
+            holidays = {};
+            renderSchedule();
+            updateStats();
+            
+            const weekDoc = window.firebaseDoc(window.db, 'schedules', currentWeekStart);
+            unsubscribeSchedule = window.firebaseOnSnapshot(weekDoc, (docSnapshot) => {
+                if (docSnapshot.exists()) {
+                    const data = docSnapshot.data();
+                    schedule = data.schedule || {};
+                    scheduleConfirmations = data.confirmations || {};
+                    vacations = data.vacations || {};
+                    noWorkBlocks = data.noWork || {};
+                    holidays = data.holidays || {};
+                } else {
+                    schedule = {};
+                    scheduleConfirmations = {};
+                    vacations = {};
+                    noWorkBlocks = {};
+                    holidays = {};
+                }
+
+                renderSchedule();
+                updateStats();
+            });
+        }
+
+        function subscribeToConfig() {
+            if (!window.db) return;
+            
+            const configDoc = window.firebaseDoc(window.db, 'config', 'settings');
+            unsubscribeConfig = window.firebaseOnSnapshot(configDoc, (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    if (data.posts) {
+                        POSTS = Array.isArray(data.posts)
+                            ? data.posts.map(normalizePost)
+                            : DEFAULT_POSTS.map(normalizePost);
+                    }
+                    if (data.guards) guards = data.guards;
+                    if (data.users) {
+                        users = data.users;
+                        // Update login dropdown if on login screen
+                        if (document.getElementById('loginScreen').style.display !== 'none') {
+                            populateLoginDropdown();
+                        }
+                    }
+                    renderGuards();
+                    renderSchedule();
+                    updateStats();
+                }
+            });
+        }
+
+        function initializeApp() {
+            // Only proceed if Firebase is ready
+            if (!window.db) {
+                console.warn('Firebase not ready, waiting...');
+                // Retry in 1 second
+                setTimeout(initializeApp, 1000);
+                return;
+            }
+
+            // Load config from Firebase first, then populate login dropdown
+            const configDoc = window.firebaseDoc(window.db, 'config', 'settings');
+            window.firebaseGetDoc(configDoc).then((doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    if (data.posts) POSTS = data.posts;
+                    if (data.guards) guards = data.guards;
+                    if (data.users) users = data.users;
+                    console.log('Loaded guards from Firebase:', guards);
+                } else {
+                    // No config exists yet - first time setup
+                    // Set default guards for initial configuration
+                    console.log('No Firebase config found - first time setup');
+                    guards = ['Guard 1', 'Guard 2', 'Guard 3', 'Guard 4', 'Guard 5', 'Guard 6', 'Guard 7'];
+                    
+                    // Create default users for these guards
+                    guards.forEach((guard, index) => {
+                        users[guard] = {
+                            password: `pass${index + 1}`,
+                            role: 'guard',
+                            displayName: guard,
+                            preferredPost: ''
+                        };
+                    });
+                    
+                    // Save to Firebase for next time
+                    saveConfigToFirebase();
+                }
+                
+                populateLoginDropdown();
+                
+                // Hide loading screen, show login screen
+                document.getElementById('loadingScreen').style.display = 'none';
+                
+                // Check for existing session
+                const savedUser = sessionStorage.getItem('currentUser');
+                if (savedUser && users[savedUser]) {
+                    currentUser = savedUser;
+                    userRole = users[savedUser].role;
+                    showApp();
+                } else {
+                    document.getElementById('loginScreen').style.display = 'flex';
+                }
+            }).catch((error) => {
+                console.error('Error loading config:', error);
+                
+                // Fallback to defaults on error
+                guards = ['Guard 1', 'Guard 2', 'Guard 3', 'Guard 4', 'Guard 5', 'Guard 6', 'Guard 7'];
+                guards.forEach((guard, index) => {
+                    users[guard] = {
+                        password: `pass${index + 1}`,
+                        role: 'guard',
+                        displayName: guard,
+                        preferredPost: ''
+                    };
+                });
+                
+                populateLoginDropdown();
+                
+                // Hide loading screen, show login screen anyway
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('loginScreen').style.display = 'flex';
+            });
+        }
+
+        function populateLoginDropdown() {
+            const userSelect = document.getElementById('userSelect');
+            if (!userSelect) return;
+
+            if (!guards || guards.length === 0) {
+                userSelect.innerHTML = '<option value="">Loading guards from cloud...</option>';
+                console.log('Waiting for guards to load from Firebase');
+                return;
+            }
+
+            const options = ['<option value="">Select User...</option>'];
+
+            if (users.admin) {
+                const adminDisplay = users.admin.displayName || 'Administrator';
+                options.push(`<option value="admin">${adminDisplay}</option>`);
+            }
+
+            // Add business users
+            Object.keys(users).forEach(username => {
+                if (users[username].role === 'business') {
+                    options.push(`<option value="${username}">${users[username].displayName}</option>`);
+                }
+            });
+
+            guards.forEach(guardName => {
+                const guardUser = users[guardName];
+                const displayName = guardUser && guardUser.displayName ? guardUser.displayName : guardName;
+                options.push(`<option value="${guardName}">${displayName}</option>`);
+            });
+
+            userSelect.innerHTML = options.join('');
+            console.log('Login dropdown populated with guards:', guards);
+        }
+
+        function login() {
+            const username = document.getElementById('userSelect').value;
+            const password = document.getElementById('passwordInput').value;
+            const errorDiv = document.getElementById('loginError');
+
+            if (!username) {
+                errorDiv.textContent = 'Please select a user';
+                return;
+            }
+
+            if (!password) {
+                errorDiv.textContent = 'Please enter a password';
+                return;
+            }
+
+            if (users[username] && users[username].password === password) {
+                currentUser = username;
+                userRole = users[username].role;
+                sessionStorage.setItem('currentUser', username);
+                errorDiv.textContent = '';
+                showApp();
+            } else {
+                errorDiv.textContent = 'Invalid password';
+            }
+        }
+
+        function logout() {
+            if (unsubscribeSchedule) unsubscribeSchedule();
+            if (unsubscribeConfig) unsubscribeConfig();
+            sessionStorage.removeItem('currentUser');
+            currentUser = null;
+            userRole = null;
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('userSelect').value = '';
+            const clearSelfBtn = document.getElementById('clearSelfButton');
+            if (clearSelfBtn) {
+                clearSelfBtn.style.display = 'none';
+            }
+        }
+
+        function showApp() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            document.getElementById('currentUserDisplay').textContent = users[currentUser].displayName;
+            let roleText = '(Guard)';
+            if (userRole === 'admin') roleText = '(Administrator)';
+            else if (userRole === 'business') roleText = '(Business)';
+            document.getElementById('roleDisplay').textContent = roleText;
+
+            // Show/hide admin-only features
+            const adminButtons = document.querySelectorAll('.admin-only');
+            adminButtons.forEach(btn => {
+                if (userRole === 'admin') {
+                    btn.classList.add('visible');
+                } else {
+                    btn.classList.remove('visible');
+                }
+            });
+
+            // Show/hide business features
+            const businessButtons = document.querySelectorAll('.admin-business-only');
+            businessButtons.forEach(btn => {
+                if (userRole === 'admin' || userRole === 'business') {
+                    btn.classList.add('visible');
+                } else {
+                    btn.classList.remove('visible');
+                }
+            });
+
+            const clearSelfBtn = document.getElementById('clearSelfButton');
+            if (clearSelfBtn) {
+                clearSelfBtn.style.display = userRole === 'guard' ? 'inline-block' : 'none';
+            }
+
+            // Set to current week's Friday
+            const today = new Date();
+            const weekStartDate = getWeekStartDate(today) || today;
+            currentWeekStart = toISODate(weekStartDate);
+            document.getElementById('weekStart').value = currentWeekStart;
+            
+            // Subscribe to Firebase updates
+            subscribeToConfig();
+            subscribeToSchedule();
+            
+            renderGuards();
+            renderSchedule();
+            updateStats();
+        }
+
+        function renderGuards() {
+            const guardsList = document.getElementById('guardsList');
+            
+            if (!guardsList) return;
+
+            if (userRole === 'business') {
+                const header = document.querySelector('.guards-panel h3');
+                if (header) header.textContent = 'Available Guards (Click to Select)';
+                
+                let html = guards.map(guard => {
+                    const isSelected = selectedPost === guard;
+                    return `<div class="guard-badge ${isSelected ? 'selected' : ''}" 
+                          onclick="selectPost('${guard}')">
+                        ${guard}
+                    </div>`;
+                }).join('');
+                guardsList.innerHTML = html;
+                return;
+            } else {
+                const header = document.querySelector('.guards-panel h3');
+                if (header) header.textContent = 'Available Posts (Click to Select)';
+            }
+            
+            let html = POSTS.filter(post => {
+                const postData = typeof post === 'string' ? { name: post } : post;
+                if (userRole === 'guard') {
+                    return !postData.hiddenFromGuards;
+                }
+                return true;
+            }).map(post => {
+                const postData = typeof post === 'string' ? { name: post } : post;
+                return `<div class="guard-badge ${selectedPost === postData.name ? 'selected' : ''}" 
+                      onclick="selectPost('${postData.name}')">
+                    ${postData.name}
+                </div>`;
+            }).join('');
+            
+            if (userRole === 'guard' || userRole === 'admin') {
+                html += `<div class="guard-badge no-work-badge ${selectedPost === 'NO_WORK' ? 'selected' : ''}" 
+                          onclick="selectPost('NO_WORK')">
+                    🚫 No Work
+                </div>`;
+                html += `<div class="vacation-badge ${selectedPost === 'VACATION' ? 'selected' : ''}" 
+                          onclick="selectPost('VACATION')">
+                    🏖️ Vacation
+                </div>`;
+            }
+            
+            guardsList.innerHTML = html;
+        }
+
+        function selectPost(post) {
+            selectedPost = selectedPost === post ? null : post;
+            renderGuards();
+        }
+
+        function renderSchedule() {
+            if (userRole === 'business') {
+                renderBusinessSchedule();
+                return;
+            }
+
+            const view = document.getElementById('scheduleView');
+            
+            const displayGuards = userRole === 'admin' ? guards : [currentUser];
+            const indicatorGuards = (guards && guards.length > 0) ? guards : displayGuards;
+
+            let html = '<div class="week-view">';
+            
+            html += '<div class="post-label">Guards</div>';
+            DAYS.forEach((day, dayIndex) => {
+                const holidayName = holidays[dayIndex];
+                const baseWeekStart = currentWeekStart
+                    ? new Date(`${currentWeekStart}T00:00:00`)
+                    : getWeekStartDate(new Date()) || new Date();
+                const currentDate = new Date(baseWeekStart);
+                currentDate.setDate(baseWeekStart.getDate() + dayIndex);
+                const dateStr = `${currentDate.getMonth() + 1}/${currentDate.getDate()}`;
+                const noWorkCount = indicatorGuards.reduce((count, guard) => {
+                    const key = `${guard}_${dayIndex}`;
+                    return count + (noWorkBlocks[key] ? 1 : 0);
+                }, 0);
+                
+                const headerText = holidayName 
+                    ? `${day}<br><small style="font-size: 12px;">${dateStr}</small><br><small style="font-size: 11px;">🎉 ${holidayName}</small>` 
+                    : `${day}<br><small style="font-size: 12px; opacity: 0.8;">${dateStr}</small>`;
+                const indicatorHtml = noWorkCount > 0 
+                    ? `<span class="day-indicator no-work-indicator" title="${noWorkCount} no-work request${noWorkCount > 1 ? 's' : ''}">🚫 ${noWorkCount}</span>`
+                    : '';
+                    
+                html += `<div class="day-header ${holidayName ? 'holiday-cell' : ''}">${indicatorHtml}${headerText}</div>`;
+            });
+            
+            displayGuards.forEach(guard => {
+                const guardUser = users[guard];
+                const preferredPost = guardUser ? guardUser.preferredPost : '';
+                
+                html += `<div class="post-label">${guard}</div>`;
+                DAYS.forEach((day, dayIndex) => {
+                    const isHoliday = holidays[dayIndex];
+                    const vacationKey = `${guard}_${dayIndex}`;
+                    const noWorkKey = `${guard}_${dayIndex}`;
+                    const isOnVacation = vacations[vacationKey];
+                    const isNoWork = noWorkBlocks[noWorkKey];
+                    const assignedPost = isOnVacation ? null : getGuardAssignment(guard, dayIndex);
+                    const conflict = !isOnVacation && assignedPost && isGuardConflict(guard, dayIndex);
+                    const isCurrentGuard = guard === currentUser;
+                    const canEdit = !isHoliday && (userRole === 'admin' || isCurrentGuard);
+                    const noWorkFlagHtml = isNoWork 
+                        ? `<span class="cell-indicator no-work-indicator" title="${guard} requested no work for this day">🚫</span>`
+                        : '';
+
+                    let isPreferredPost = false;
+                    let dayHours = null;
+                    if (assignedPost) {
+                        const postData = POSTS.find(p => (typeof p === 'string' ? p : p.name) === assignedPost);
+                        if (postData && postData.hours) {
+                            dayHours = postData.hours[dayIndex];
+                            isPreferredPost = preferredPost && assignedPost === preferredPost;
+                        }
+                    }
+                    
+                    let cellClass = '';
+                    let cellContent = '';
+                    let confirmationHtml = '';
+                    let cellClickHandler = `assignPost(${JSON.stringify(guard)}, ${dayIndex})`;
+                    let requiresReview = false;
+
+                    if (isHoliday) {
+                        cellClass = 'holiday-cell read-only';
+                        cellContent = `<div class="guard-name">🎉 HOLIDAY</div>`;
+                    } else if (isOnVacation) {
+                        cellClass = 'vacation-cell';
+                        cellContent = `<div class="guard-name">🏖️ VACATION</div>`;
+                    } else if (isNoWork) {
+                        cellClass = 'no-work-cell';
+                        cellContent = `<div class="guard-name">🚫 NO WORK</div>`;
+                    } else if (assignedPost) {
+                        cellClass = 'assigned';
+                        const timeInfo = dayHours ? `<br><small style="font-size: 10px; opacity: 0.9;">${dayHours.startTime}-${dayHours.endTime}</small>` : '';
+                        cellContent = `<div class="guard-name">${assignedPost}${isPreferredPost ? ' ⭐' : ''}${timeInfo}</div>`;
+
+                        const confirmationKey = getConfirmationKey(assignedPost, dayIndex);
+                        const confirmation = scheduleConfirmations[confirmationKey];
+                        if (confirmation) {
+                            if (confirmation.status === 'confirmed') {
+                                confirmationHtml = '<div class="confirmation-status confirmed">✅ Confirmed</div>';
+                            } else {
+                                const awaitingGuard = confirmation.awaiting === 'guard';
+                                const awaitingAdmin = confirmation.awaiting === 'admin';
+                                const guardNeedsAction = awaitingGuard && userRole === 'guard' && guard === currentUser;
+                                const adminNeedsAction = awaitingAdmin && userRole === 'admin';
+
+                                if (guardNeedsAction || adminNeedsAction) {
+                                    requiresReview = true;
+                                    const actionText = guardNeedsAction ? 'Tap to confirm or decline' : 'Tap to approve or decline';
+                                    confirmationHtml = `<div class="confirmation-status awaiting">${actionText}</div>`;
+                                    cellClickHandler = `reviewShift(${JSON.stringify(assignedPost)}, ${dayIndex}, ${JSON.stringify(guard)})`;
+                                } else {
+                                    confirmationHtml = `<div class="confirmation-status awaiting">${awaitingGuard ? 'Awaiting guard confirmation' : 'Awaiting admin confirmation'}</div>`;
+                                }
+                            }
+                        }
+                        if (scheduleConfirmations[confirmationKey] && scheduleConfirmations[confirmationKey].status === 'confirmed') {
+                            cellClass += ' confirmed-shift';
+                        } else if (requiresReview) {
+                            cellClass += ' pending-shift';
+                        }
+                    }
+                    
+                    html += `<div class="schedule-cell ${cellClass} ${!canEdit ? 'read-only' : ''}" 
+                                  onclick='${cellClickHandler}'>
+                        ${noWorkFlagHtml}
+                        ${cellContent}
+                        ${confirmationHtml}
+                        ${conflict ? '<div class="conflict-warning">⚠️ Conflict</div>' : ''}
+                    </div>`;
+                });
+            });
+
+            html += '</div>';
+            view.innerHTML = html;
+        }
+
+        function renderBusinessSchedule() {
+            const view = document.getElementById('scheduleView');
+            const myPosts = POSTS.filter(p => p.owner === currentUser);
+            
+            let html = '<div class="week-view">';
+            
+            html += '<div class="post-label">Posts</div>';
+            DAYS.forEach((day, dayIndex) => {
+                const holidayName = holidays[dayIndex];
+                const baseWeekStart = currentWeekStart
+                    ? new Date(`${currentWeekStart}T00:00:00`)
+                    : getWeekStartDate(new Date()) || new Date();
+                const currentDate = new Date(baseWeekStart);
+                currentDate.setDate(baseWeekStart.getDate() + dayIndex);
+                const dateStr = `${currentDate.getMonth() + 1}/${currentDate.getDate()}`;
+                
+                const headerText = holidayName 
+                    ? `${day}<br><small style="font-size: 12px;">${dateStr}</small><br><small style="font-size: 11px;">🎉 ${holidayName}</small>` 
+                    : `${day}<br><small style="font-size: 12px; opacity: 0.8;">${dateStr}</small>`;
+                    
+                html += `<div class="day-header ${holidayName ? 'holiday-cell' : ''}">${headerText}</div>`;
+            });
+            
+            myPosts.forEach(post => {
+                html += `<div class="post-label">${post.name}</div>`;
+                
+                DAYS.forEach((day, dayIndex) => {
+                    const key = `${post.name}_${dayIndex}`;
+                    const assignedGuard = schedule[key];
+                    const isHoliday = holidays[dayIndex];
+                    
+                    let cellClass = '';
+                    let cellContent = '';
+                    
+                    if (isHoliday) {
+                        cellClass = 'holiday-cell read-only';
+                        cellContent = '<div class="guard-name">🎉 HOLIDAY</div>';
+                    } else if (assignedGuard) {
+                        cellClass = 'assigned';
+                        cellContent = `<div class="guard-name">${assignedGuard}</div>`;
+                    } else {
+                        cellClass = 'schedule-cell';
+                        cellContent = '<div style="color: #ccc; font-size: 12px;">Empty</div>';
+                    }
+                    
+                    html += `<div class="schedule-cell ${cellClass}" onclick="assignGuardToPost('${post.name}', ${dayIndex})">
+                        ${cellContent}
+                    </div>`;
+                });
+            });
+            
+            html += '</div>';
+            view.innerHTML = html;
+        }
+
+        async function assignGuardToPost(postName, dayIndex) {
+            if (holidays[dayIndex]) {
+                alert('This day is a holiday.');
+                return;
+            }
+
+            if (!selectedPost) {
+                const existing = schedule[`${postName}_${dayIndex}`];
+                if (existing) {
+                    if (confirm(`Remove ${existing} from ${postName}?`)) {
+                        delete schedule[`${postName}_${dayIndex}`];
+                        delete scheduleConfirmations[`${postName}_${dayIndex}`];
+                        await saveToFirebase();
+                        renderSchedule();
+                    }
+                }
+                return;
+            }
+            
+            const guardName = selectedPost;
+            schedule[`${postName}_${dayIndex}`] = guardName;
+            setAssignmentConfirmation(postName, dayIndex, guardName, 'business');
+            
+            await saveToFirebase();
+            renderSchedule();
+        }
+
+        function getGuardAssignment(guard, dayIndex) {
+            for (let post of POSTS) {
+                const postName = typeof post === 'string' ? post : post.name;
+                const key = `${postName}_${dayIndex}`;
+                if (schedule[key] === guard) {
+                    return postName;
+                }
+            }
+            return null;
+        }
+
+        function isGuardConflict(guard, dayIndex) {
+            let count = 0;
+            POSTS.forEach(post => {
+                const postName = typeof post === 'string' ? post : post.name;
+                const key = `${postName}_${dayIndex}`;
+                if (schedule[key] === guard) {
+                    count++;
+                }
+            });
+            return count > 1;
+        }
+
+        function getConfirmationKey(postName, dayIndex) {
+            return `${postName}_${dayIndex}`;
+        }
+
+        function clearGuardAssignmentsForDay(guard, dayIndex) {
+            let removed = false;
+            POSTS.forEach(post => {
+                const postName = typeof post === 'string' ? post : post.name;
+                const key = getConfirmationKey(postName, dayIndex);
+                if (schedule[key] === guard) {
+                    delete schedule[key];
+                    removed = true;
+                }
+                const confirmation = scheduleConfirmations[key];
+                if (confirmation && confirmation.guard === guard) {
+                    delete scheduleConfirmations[key];
+                    removed = true;
+                }
+            });
+            return removed;
+        }
+
+        function clearPostAssignmentForOtherGuard(postName, dayIndex, newGuard) {
+            const key = getConfirmationKey(postName, dayIndex);
+            const existingGuard = schedule[key];
+            if (existingGuard && existingGuard !== newGuard) {
+                delete schedule[key];
+                const confirmation = scheduleConfirmations[key];
+                if (confirmation && confirmation.guard === existingGuard) {
+                    delete scheduleConfirmations[key];
+                }
+                return true;
+            }
+            return false;
+        }
+
+        function setAssignmentConfirmation(postName, dayIndex, guard, assignedByRole) {
+            const awaiting = (assignedByRole === 'admin' || assignedByRole === 'business') ? 'guard' : 'admin';
+            scheduleConfirmations[getConfirmationKey(postName, dayIndex)] = {
+                guard,
+                assignedBy: assignedByRole,
+                awaiting,
+                status: 'pending',
+                confirmedBy: null,
+                lastUpdated: new Date().toISOString()
+            };
+        }
+
+        function removeConfirmation(postName, dayIndex, guard) {
+            const key = getConfirmationKey(postName, dayIndex);
+            const confirmation = scheduleConfirmations[key];
+            if (!confirmation) return;
+            if (guard && confirmation.guard !== guard) return;
+            delete scheduleConfirmations[key];
+        }
+
+        async function assignPost(guard, dayIndex) {
+            if (holidays[dayIndex]) {
+                if (userRole === 'admin') {
+                    alert('This day is marked as a holiday. Remove the holiday from Manage Holidays to schedule on this day.');
+                } else {
+                    alert('This day is a holiday - no scheduling available.');
+                }
+                return;
+            }
+
+            if (userRole !== 'admin' && guard !== currentUser) {
+                alert('You can only modify your own schedule');
+                return;
+            }
+
+            const vacationKey = `${guard}_${dayIndex}`;
+            const noWorkKey = `${guard}_${dayIndex}`;
+            let changed = false;
+
+            if (selectedPost === 'VACATION') {
+                if (vacations[vacationKey]) {
+                    delete vacations[vacationKey];
+                    changed = true;
+                } else {
+                    if (userRole === 'guard') {
+                        const otherGuardOnVacation = isAnyGuardOnVacation(dayIndex, guard);
+                        if (otherGuardOnVacation) {
+                            alert('Cannot take vacation - another guard is already on vacation this day. Please contact your administrator.');
+                            return;
+                        }
+                        
+                        const dayHasAssignments = isDayClaimedByAnyone(dayIndex);
+                        if (dayHasAssignments) {
+                            alert('Cannot take vacation - this day already has post assignments');
+                            return;
+                        }
+                    }
+                    
+                    vacations[vacationKey] = true;
+                    if (clearGuardAssignmentsForDay(guard, dayIndex)) {
+                        changed = true;
+                    }
+                    changed = true;
+                }
+            } else if (selectedPost === 'NO_WORK') {
+                if (noWorkBlocks[noWorkKey]) {
+                    delete noWorkBlocks[noWorkKey];
+                    changed = true;
+                } else {
+                    noWorkBlocks[noWorkKey] = true;
+                    if (clearGuardAssignmentsForDay(guard, dayIndex)) {
+                        changed = true;
+                    }
+                    changed = true;
+                }
+            } else {
+                if (vacations[vacationKey]) {
+                    alert('Cannot assign post - guard is on vacation this day');
+                    return;
+                }
+
+                if (noWorkBlocks[noWorkKey]) {
+                    const guardCanOverride = userRole === 'guard' && guard === currentUser;
+                    if (guardCanOverride) {
+                        const reopen = confirm('This day was marked "No Work". Do you want to open it up so you can work?');
+                        if (reopen) {
+                            delete noWorkBlocks[noWorkKey];
+                            changed = true;
+                            await saveToFirebase();
+                            renderSchedule();
+                            updateStats();
+                            alert('Day reopened. Select a shift to claim it.');
+                            return;
+                        } else {
+                            return;
+                        }
+                    } else {
+                        alert('Cannot assign post - guard is marked as No Work this day');
+                        return;
+                    }
+                }
+                
+                if (selectedPost) {
+                    const postData = POSTS.find(p => (typeof p === 'string' ? p : p.name) === selectedPost);
+                    if (postData && postData.hours) {
+                        const dayHours = postData.hours[dayIndex];
+                        if (dayHours && !dayHours.active) {
+                            alert(`${selectedPost} is not active on ${DAYS[dayIndex]}. Please check post configuration.`);
+                            return;
+                        }
+                    }
+                }
+
+                if (!selectedPost) {
+                    if (clearGuardAssignmentsForDay(guard, dayIndex)) {
+                        changed = true;
+                    }
+                } else {
+                    if (noWorkBlocks[noWorkKey]) {
+                        delete noWorkBlocks[noWorkKey];
+                        changed = true;
+                    }
+                    const displaced = clearPostAssignmentForOtherGuard(selectedPost, dayIndex, guard);
+                    const removedExisting = clearGuardAssignmentsForDay(guard, dayIndex);
+                    const key = getConfirmationKey(selectedPost, dayIndex);
+                    const existingAssignment = schedule[key];
+                    if (existingAssignment !== guard) {
+                        schedule[key] = guard;
+                        changed = true;
+                    } else if (removedExisting) {
+                        changed = true;
+                    }
+                    if (displaced) {
+                        changed = true;
+                    }
+                    setAssignmentConfirmation(selectedPost, dayIndex, guard, userRole);
+                    changed = true;
+                }
+            }
+            
+            if (changed) {
+                await saveToFirebase();
+                renderSchedule();
+                updateStats();
+            }
+        }
+
+        function reviewShift(postName, dayIndex, guard) {
+            const key = getConfirmationKey(postName, dayIndex);
+            const confirmation = scheduleConfirmations[key];
+            if (!confirmation) return;
+
+            const modal = document.getElementById('shiftModal');
+            const titleEl = document.getElementById('shiftModalTitle');
+            const detailsEl = document.getElementById('shiftModalDetails');
+            const statusEl = document.getElementById('shiftModalStatus');
+            const actionsEl = document.getElementById('shiftModalActions');
+
+            const dayName = DAYS[dayIndex] || '';
+            const guardDisplay = users[guard] ? users[guard].displayName : guard;
+            const postData = POSTS.find(p => (typeof p === 'string' ? p : p.name) === postName);
+            const dayHours = postData && postData.hours ? postData.hours[dayIndex] : null;
+            const hoursText = dayHours ? `${dayHours.startTime} - ${dayHours.endTime}` : 'N/A';
+
+            titleEl.textContent = `Review Shift - ${postName} (${dayName})`;
+            detailsEl.innerHTML = `
+                <strong>Guard:</strong> ${guardDisplay}<br>
+                <strong>Hours:</strong> ${hoursText}<br>
+                <strong>Assigned By:</strong> ${confirmation.assignedBy === 'admin' ? 'Administrator' : guardDisplay}<br>
+                <strong>Last Updated:</strong> ${new Date(confirmation.lastUpdated || Date.now()).toLocaleString()}
+            `;
+
+            const awaitingGuard = confirmation.awaiting === 'guard';
+            const awaitingAdmin = confirmation.awaiting === 'admin';
+            const guardCanAct = awaitingGuard && guard === currentUser && userRole === 'guard';
+            const adminCanAct = awaitingAdmin && userRole === 'admin';
+            const canAct = guardCanAct || adminCanAct;
+
+            statusEl.className = 'confirmation-status awaiting';
+            if (guardCanAct) {
+                statusEl.textContent = 'Awaiting your confirmation';
+            } else if (adminCanAct) {
+                statusEl.textContent = 'Awaiting your approval';
+            } else if (awaitingGuard) {
+                statusEl.textContent = 'Awaiting guard confirmation';
+            } else if (awaitingAdmin) {
+                statusEl.textContent = 'Awaiting admin confirmation';
+            } else {
+                statusEl.textContent = 'Pending';
+            }
+
+            actionsEl.innerHTML = '';
+            if (canAct) {
+                const confirmBtn = document.createElement('button');
+                confirmBtn.className = 'btn btn-primary';
+                confirmBtn.textContent = 'Confirm Shift';
+                confirmBtn.onclick = () => confirmShift(null, postName, dayIndex);
+                actionsEl.appendChild(confirmBtn);
+
+                const declineBtn = document.createElement('button');
+                declineBtn.className = 'btn btn-secondary';
+                declineBtn.textContent = 'Decline Shift';
+                declineBtn.onclick = () => declineShift(postName, dayIndex, guard);
+                actionsEl.appendChild(declineBtn);
+            } else {
+                const infoText = document.createElement('div');
+                infoText.style.color = '#6c757d';
+                infoText.textContent = 'No actions available for your role.';
+                actionsEl.appendChild(infoText);
+            }
+
+            shiftModalContext = { postName, dayIndex, guard };
+            modal.classList.add('active');
+        }
+
+        async function confirmShift(event, postName, dayIndex) {
+            if (event) {
+                event.stopPropagation();
+            }
+
+            const key = getConfirmationKey(postName, dayIndex);
+            const confirmation = scheduleConfirmations[key];
+            if (!confirmation) {
+                return;
+            }
+
+            if (confirmation.status === 'confirmed') {
+                return;
+            }
+
+            if (confirmation.awaiting === 'guard') {
+                if (userRole !== 'guard' || confirmation.guard !== currentUser) {
+                    alert('Only the assigned guard can confirm this shift.');
+                    return;
+                }
+            } else if (confirmation.awaiting === 'admin') {
+                if (userRole !== 'admin') {
+                    alert('Only an administrator can confirm this shift.');
+                    return;
+                }
+            } else {
+                return;
+            }
+
+            confirmation.status = 'confirmed';
+            confirmation.awaiting = null;
+            confirmation.confirmedBy = userRole;
+            confirmation.lastUpdated = new Date().toISOString();
+
+            await saveToFirebase();
+            renderSchedule();
+            updateStats();
+            if (document.getElementById('shiftModal')?.classList.contains('active')) {
+                closeShiftModal();
+            }
+        }
+
+        async function declineShift(postName, dayIndex, guard) {
+            const key = getConfirmationKey(postName, dayIndex);
+            const confirmation = scheduleConfirmations[key];
+            if (!confirmation) return;
+
+            const awaitingGuard = confirmation.awaiting === 'guard';
+            const awaitingAdmin = confirmation.awaiting === 'admin';
+            const guardCanAct = awaitingGuard && userRole === 'guard' && guard === currentUser;
+            const adminCanAct = awaitingAdmin && userRole === 'admin';
+
+            if (!guardCanAct && !adminCanAct) {
+                alert('You are not allowed to decline this shift.');
+                return;
+            }
+
+            delete schedule[key];
+            delete scheduleConfirmations[key];
+            closeShiftModal();
+
+            await saveToFirebase();
+            renderSchedule();
+            updateStats();
+        }
+
+        async function clearWeek() {
+            if (userRole !== 'admin') {
+                alert('Only administrators can clear the week');
+                return;
+            }
+
+            if (!currentWeekStart) {
+                alert('No week selected. Please load a week first.');
+                return;
+            }
+
+            if (!confirm('Clear all unconfirmed shifts for this week? Confirmed shifts will remain.')) {
+                return;
+            }
+
+            let removed = false;
+            Object.keys(schedule).forEach(key => {
+                const confirmation = scheduleConfirmations[key];
+                const isConfirmed = confirmation && confirmation.status === 'confirmed';
+                if (!isConfirmed) {
+                    delete schedule[key];
+                    if (confirmation) {
+                        delete scheduleConfirmations[key];
+                    }
+                    removed = true;
+                }
+            });
+
+            if (!removed) {
+                alert('No unconfirmed shifts found to clear.');
+                return;
+            }
+
+            await saveToFirebase();
+            renderSchedule();
+            updateStats();
+            alert('Unconfirmed shifts have been cleared for this week.');
+        }
+
+        function isAnyGuardOnVacation(dayIndex, excludeGuard) {
+            for (let guard of guards) {
+                if (guard === excludeGuard) continue;
+                const vacationKey = `${guard}_${dayIndex}`;
+                if (vacations[vacationKey]) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function isDayClaimedByAnyone(dayIndex) {
+            for (let post of POSTS) {
+                const postName = typeof post === 'string' ? post : post.name;
+                const key = `${postName}_${dayIndex}`;
+                if (schedule[key]) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function isSlotActive(postName, dayIndex) {
+            const numericDay = typeof dayIndex === 'string' ? parseInt(dayIndex, 10) : dayIndex;
+            if (Number.isNaN(numericDay)) return false;
+            if (holidays[numericDay]) return false;
+
+            const postData = POSTS.find(p => (typeof p === 'string' ? p : p.name) === postName);
+            if (!postData || !postData.hours || !postData.hours[numericDay]) {
+                return true;
+            }
+
+            return postData.hours[numericDay].active !== false;
+        }
+
+        function updateStats() {
+            const stats = {};
+            const vacationStats = {};
+            const preferredStats = {};
+            
+            guards.forEach(guard => {
+                stats[guard] = 0;
+                vacationStats[guard] = 0;
+                preferredStats[guard] = 0;
+            });
+            
+            Object.entries(schedule).forEach(([key, guard]) => {
+                const [postName, dayIndexStr] = key.split('_');
+                if (!isSlotActive(postName, dayIndexStr)) {
+                    return;
+                }
+
+                if (stats[guard] !== undefined) {
+                    stats[guard]++;
+                    
+                    const guardUser = users[guard];
+                    if (guardUser && guardUser.preferredPost === postName) {
+                        preferredStats[guard]++;
+                    }
+                }
+            });
+            
+            Object.keys(vacations).forEach(key => {
+                const guard = key.split('_')[0];
+                if (vacationStats[guard] !== undefined) {
+                    vacationStats[guard]++;
+                }
+            });
+
+            let totalSlots = 0;
+            DAYS.forEach((_, dayIndex) => {
+                if (holidays[dayIndex]) {
+                    return;
+                }
+                POSTS.forEach(post => {
+                    const postName = typeof post === 'string' ? post : post.name;
+                    if (isSlotActive(postName, dayIndex)) {
+                        totalSlots++;
+                    }
+                });
+            });
+
+            let totalAssigned = 0;
+            Object.keys(schedule).forEach(key => {
+                const [postName, dayIndexStr] = key.split('_');
+                if (isSlotActive(postName, dayIndexStr)) {
+                    totalAssigned++;
+                }
+            });
+
+            const uncoveredShifts = Math.max(totalSlots - totalAssigned, 0);
+            const totalVacations = Object.keys(vacations).length;
+            const totalHolidays = Object.keys(holidays).length;
+            const conflicts = countConflicts();
+
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="stat-value">${uncoveredShifts}</div>
+                    <div class="stat-label">Shifts Open</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${totalVacations}</div>
+                    <div class="stat-label">Vacation Days</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${totalHolidays}</div>
+                    <div class="stat-label">Holidays</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${conflicts}</div>
+                    <div class="stat-label">Conflicts</div>
+                </div>
+                ${guards.map(guard => {
+                    const guardUser = users[guard];
+                    const preferredPost = guardUser ? guardUser.preferredPost : '';
+                    const preferredCount = preferredStats[guard];
+                    const preferredInfo = preferredPost && preferredCount > 0 ? ` | ⭐${preferredCount}` : '';
+                    
+                    return `
+                        <div class="stat-card">
+                            <div class="stat-value">${stats[guard]} shifts / ${vacationStats[guard]} vac${preferredInfo}</div>
+                            <div class="stat-label">${guard}${preferredPost ? ` (⭐ ${preferredPost})` : ''}</div>
+                        </div>
+                    `;
+                }).join('')}
+            `;
+
+            document.getElementById('statsView').innerHTML = statsHtml;
+        }
+
+        function countConflicts() {
+            let conflicts = 0;
+            DAYS.forEach((day, dayIndex) => {
+                const guardsOnDay = {};
+                POSTS.forEach(post => {
+                    const postName = typeof post === 'string' ? post : post.name;
+                    const key = `${postName}_${dayIndex}`;
+                    const guard = schedule[key];
+                    if (guard) {
+                        guardsOnDay[guard] = (guardsOnDay[guard] || 0) + 1;
+                    }
+                });
+                Object.values(guardsOnDay).forEach(count => {
+                    if (count > 1) conflicts++;
+                });
+            });
+            return conflicts;
+        }
+
+        function loadWeek() {
+            const inputEl = document.getElementById('weekStart');
+            const selectedValue = inputEl.value;
+            const rawDate = selectedValue ? new Date(`${selectedValue}T00:00:00`) : new Date();
+            const weekStartDate = getWeekStartDate(rawDate);
+            if (!weekStartDate) return;
+            currentWeekStart = toISODate(weekStartDate);
+            inputEl.value = currentWeekStart;
+            if (unsubscribeSchedule) {
+                unsubscribeSchedule();
+            }
+            subscribeToSchedule();
+            renderSchedule();
+            updateStats();
+        }
+
+        function previousWeek() {
+            const inputEl = document.getElementById('weekStart');
+            const baseValue = currentWeekStart || inputEl.value;
+            const baseDate = baseValue ? new Date(`${baseValue}T00:00:00`) : new Date();
+            baseDate.setDate(baseDate.getDate() - 7);
+            inputEl.value = toISODate(getWeekStartDate(baseDate) || baseDate);
+            loadWeek();
+        }
+
+        function nextWeek() {
+            const inputEl = document.getElementById('weekStart');
+            const baseValue = currentWeekStart || inputEl.value;
+            const baseDate = baseValue ? new Date(`${baseValue}T00:00:00`) : new Date();
+            baseDate.setDate(baseDate.getDate() + 7);
+            inputEl.value = toISODate(getWeekStartDate(baseDate) || baseDate);
+            loadWeek();
+        }
+
+        async function autoSchedule() {
+            if (userRole !== 'admin') {
+                alert('Only administrators can use auto-schedule');
+                return;
+            }
+
+            if (!confirm('This will clear the current schedule and create a new one. Continue?')) {
+                return;
+            }
+
+            schedule = {};
+            
+            DAYS.forEach((day, dayIndex) => {
+                const usedGuards = new Set();
+                const unassignedPosts = [...POSTS.map(p => typeof p === 'string' ? p : p.name)];
+                
+                // Phase 1: Assign guards to their preferred posts first
+                guards.forEach(guard => {
+                    const guardUser = users[guard];
+                    if (guardUser && guardUser.preferredPost && unassignedPosts.includes(guardUser.preferredPost)) {
+                        // Check if post is active on this day
+                        const postData = POSTS.find(p => (typeof p === 'string' ? p : p.name) === guardUser.preferredPost);
+                        if (postData && postData.hours) {
+                            const dayHours = postData.hours[dayIndex];
+                            if (dayHours && dayHours.active && !usedGuards.has(guard)) {
+                                const key = `${guardUser.preferredPost}_${dayIndex}`;
+                                schedule[key] = guard;
+                                usedGuards.add(guard);
+                                const postIndex = unassignedPosts.indexOf(guardUser.preferredPost);
+                                if (postIndex > -1) {
+                                    unassignedPosts.splice(postIndex, 1);
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                // Phase 2: Fill remaining posts with guards who have no preference or couldn't get their preference
+                const availableGuards = guards.filter(g => !usedGuards.has(g));
+                let guardIndex = 0;
+                
+                unassignedPosts.forEach(postName => {
+                    // Check if post is active on this day
+                    const postData = POSTS.find(p => (typeof p === 'string' ? p : p.name) === postName);
+                    if (postData && postData.hours) {
+                        const dayHours = postData.hours[dayIndex];
+                        if (dayHours && dayHours.active && availableGuards.length > 0) {
+                            const guard = availableGuards[guardIndex % availableGuards.length];
+                            const key = `${postName}_${dayIndex}`;
+                            schedule[key] = guard;
+                            usedGuards.add(guard);
+                            guardIndex++;
+                        }
+                    }
+                });
+            });
+            
+            await saveToFirebase();
+            renderSchedule();
+            updateStats();
+        }
+
+        function showGuardManager() {
+            if (userRole !== 'admin') {
+                alert('Only administrators can manage guards');
+                return;
+            }
+
+            const modal = document.getElementById('guardModal');
+            const inputs = document.getElementById('guardInputs');
+            
+            let html = '<p style="margin-bottom: 15px; color: #6c757d;">Manage your security guards:</p>';
+            
+            guards.forEach((guard, index) => {
+                const guardUser = users[guard] || { password: `pass${index + 1}`, preferredPost: '' };
+                html += `
+                    <div class="guard-manager-item" data-index="${index}">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                            <div>
+                                <label style="font-size: 12px; color: #6c757d; display: block; margin-bottom: 5px;">Name</label>
+                                <input type="text" class="guard-input guard-name-input" value="${guard}" 
+                                        placeholder="Guard Name" data-index="${index}">
+                            </div>
+                            <div>
+                                <label style="font-size: 12px; color: #6c757d; display: block; margin-bottom: 5px;">Password</label>
+                                <input type="text" class="guard-input guard-password-input" value="${guardUser.password}" 
+                                        placeholder="Password" data-index="${index}">
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="font-size: 12px; color: #6c757d; display: block; margin-bottom: 5px;">Preferred Post (Optional)</label>
+                            <select class="guard-input guard-preferred-input" data-index="${index}">
+                                <option value="">No Preference</option>
+                                ${POSTS.map(post => {
+                                    const postName = typeof post === 'string' ? post : post.name;
+                                    return `<option value="${postName}" ${guardUser.preferredPost === postName ? 'selected' : ''}>${postName}</option>`;
+                                }).join('')}
+                            </select>
+                        </div>
+                        ${guards.length > 1 ? 
+                            `<button class="btn btn-secondary" onclick="removeGuard(${index})" style="width: 100%; margin-bottom: 10px;">Remove Guard</button>` 
+                            : ''}
+                        <hr style="margin: 15px 0; border: none; border-top: 1px solid #dee2e6;">
+                    </div>
+                `;
+            });
+            
+            html += '<button class="btn btn-success" onclick="addNewGuard()" style="margin-top: 10px; width: 100%;">+ Add Guard</button>';
+            
+            inputs.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function addNewGuard() {
+            const inputs = document.getElementById('guardInputs');
+            const currentGuards = guards.length;
+            
+            const newIndex = currentGuards;
+            const newLetter = String.fromCharCode(65 + (newIndex % 26));
+            const newGuardDiv = document.createElement('div');
+            newGuardDiv.className = 'guard-manager-item';
+            newGuardDiv.setAttribute('data-index', newIndex);
+            newGuardDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                    <div>
+                        <label style="font-size: 12px; color: #6c757d; display: block; margin-bottom: 5px;">Name</label>
+                        <input type="text" class="guard-input guard-name-input" value="Guard ${newLetter}" 
+                                placeholder="Guard Name" data-index="${newIndex}">
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; color: #6c757d; display: block; margin-bottom: 5px;">Password</label>
+                        <input type="text" class="guard-input guard-password-input" value="pass${newIndex + 1}" 
+                                placeholder="Password" data-index="${newIndex}">
+                    </div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="font-size: 12px; color: #6c757d; display: block; margin-bottom: 5px;">Preferred Post (Optional)</label>
+                    <select class="guard-input guard-preferred-input" data-index="${newIndex}">
+                        <option value="">No Preference</option>
+                        ${POSTS.map(post => {
+                            const postName = typeof post === 'string' ? post : post.name;
+                            return `<option value="${postName}">${postName}</option>`;
+                        }).join('')}
+                    </select>
+                </div>
+                <button class="btn btn-secondary" onclick="removeGuard(${newIndex})" style="width: 100%; margin-bottom: 10px;">Remove Guard</button>
+                <hr style="margin: 15px 0; border: none; border-top: 1px solid #dee2e6;">
+            `;
+            
+            const addButton = inputs.querySelector('button[onclick="addNewGuard()"]');
+            inputs.insertBefore(newGuardDiv, addButton);
+        }
+
+        function removeGuard(index) {
+            const guardItems = document.querySelectorAll('.guard-manager-item');
+            if (guardItems.length <= 1) {
+                alert('You must have at least one guard.');
+                return;
+            }
+            
+            const guardNameInput = document.querySelector(`.guard-name-input[data-index="${index}"]`);
+            const guardName = guardNameInput ? guardNameInput.value : `Guard at index ${index}`;
+            
+            if (confirm(`Remove ${guardName}? This will clear all their assignments and delete their login.`)) {
+                guardItems[index].remove();
+            }
+        }
+
+        async function saveGuards() {
+            const guardItems = document.querySelectorAll('.guard-manager-item');
+            const newGuards = [];
+            const newUsers = { 'admin': users['admin'] };
+            
+            guardItems.forEach((item, index) => {
+                const nameInput = item.querySelector('.guard-name-input');
+                const passwordInput = item.querySelector('.guard-password-input');
+                const preferredInput = item.querySelector('.guard-preferred-input');
+                
+                const guardName = nameInput ? nameInput.value.trim() : '';
+                const password = passwordInput ? passwordInput.value.trim() : `pass${index + 1}`;
+                const preferredPost = preferredInput ? preferredInput.value : '';
+                
+                if (guardName) {
+                    newGuards.push(guardName);
+                    newUsers[guardName] = {
+                        password: password || `pass${index + 1}`,
+                        role: 'guard',
+                        displayName: guardName,
+                        preferredPost: preferredPost
+                    };
+                }
+            });
+            
+            if (newGuards.length < 1) {
+                alert('Please provide at least one guard name.');
+                return;
+            }
+            
+            const uniqueNames = new Set(newGuards);
+            if (uniqueNames.size !== newGuards.length) {
+                alert('Guard names must be unique. Please check for duplicates.');
+                return;
+            }
+
+            guards = newGuards;
+            users = newUsers;
+            
+            const userSelect = document.getElementById('userSelect');
+            if (userSelect) {
+                userSelect.innerHTML = '<option value="">Select User...</option>' +
+                    Object.keys(users).map(username => 
+                        `<option value="${username}">${users[username].displayName}</option>`
+                    ).join('');
+            }
+            
+            await saveConfigToFirebase();
+            renderGuards();
+            renderSchedule();
+            updateStats();
+            closeModal();
+            
+            alert('Guards updated successfully! Changes synced to cloud.');
+        }
+
+        function showPostManager() {
+            if (userRole !== 'admin' && userRole !== 'business') {
+                alert('Only administrators and business owners can manage posts');
+                return;
+            }
+
+            const modal = document.getElementById('postModal');
+            const inputs = document.getElementById('postInputs');
+            
+            let html = '<p style="margin-bottom: 15px; color: #6c757d;">Configure posts and set different hours for each day:</p>';
+            
+            const displayPosts = userRole === 'admin' 
+                ? POSTS 
+                : POSTS.filter(p => p.owner === currentUser);
+
+            displayPosts.forEach((post, index) => {
+                const postData = normalizePost(post);
+                // Ensure we have the latest data in our local copy if it was just normalized
+                // Note: This modifies the local copy but we will save properly later
+                
+                html += `
+                    <div class="post-manager-item" data-index="${index}">
+                        <div style="margin-bottom: 15px;">
+                            <label style="font-size: 14px; font-weight: 600; color: #495057; display: block; margin-bottom: 10px;">Post Name</label>
+                            <input type="text" class="guard-input post-name-input" value="${postData.name}" 
+                                    placeholder="Post Name" data-index="${index}">
+                        </div>
+
+                        <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" class="post-hidden-input" id="hidden_${index}" 
+                                   ${postData.hiddenFromGuards ? 'checked' : ''}>
+                            <label for="hidden_${index}" style="font-size: 14px; color: #495057; cursor: pointer;">
+                                Hide this post from guards (Business visibility only)
+                            </label>
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="font-size: 14px; font-weight: 600; color: #495057; display: block; margin-bottom: 10px;">Daily Schedule</label>
+                            <div style="background: white; border: 2px solid #dee2e6; border-radius: 6px; overflow: hidden;">
+                                <!-- Header Row -->
+                                <div style="display: grid; grid-template-columns: 110px 140px 140px 120px; gap: 10px; padding: 12px; border-bottom: 2px solid #495057; background: #e9ecef; font-weight: 600;">
+                                    <div>Day</div>
+                                    <div>Start Time</div>
+                                    <div>End Time</div>
+                                    <div style="text-align: center;">Active?</div>
+                                </div>
+                                ${postData.hours.map((dayHours, dayIndex) => `
+                                    <div class="day-row ${dayHours.active ? 'active' : 'inactive'}">
+                                        <strong style="color: #495057;">${dayHours.day}</strong>
+                                        <input type="time" class="guard-input post-day-start" value="${dayHours.startTime}" 
+                                                data-post="${index}" data-day="${dayIndex}" style="padding: 8px;">
+                                        <input type="time" class="guard-input post-day-end" value="${dayHours.endTime}" 
+                                                data-post="${index}" data-day="${dayIndex}" style="padding: 8px;">
+                                        <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                            <input type="checkbox" ${dayHours.active ? 'checked' : ''} 
+                                                   data-post="${index}" data-day="${dayIndex}" 
+                                                   class="post-day-active"
+                                                   onchange="toggleDayCheckboxChange(this, ${index}, ${dayIndex})">
+                                            <span style="font-size: 12px; color: #6c757d; font-weight: 600;">${dayHours.active ? '✓ Yes' : '✗ No'}</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <p style="font-size: 11px; color: #6c757d; margin-top: 5px;">
+                                <strong>Tip:</strong> Check the box to make the day active, uncheck to disable that day for this post.
+                            </p>
+                        </div>
+                        
+                        <button class="btn btn-secondary" onclick="removePost(${index})" style="width: 100%;">Remove Post</button>
+                    </div>
+                `;
+            });
+            
+            html += '<button class="btn btn-success" onclick="addNewPost()" style="margin-top: 10px; width: 100%;">+ Add Post</button>';
+            
+            inputs.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function addNewPost() {
+            const inputs = document.getElementById('postInputs');
+            // Count existing items in the DOM to determine next index
+            const currentItems = document.querySelectorAll('.post-manager-item').length;
+            const newIndex = currentItems;
+            
+            const newPostDiv = document.createElement('div');
+            newPostDiv.className = 'post-manager-item';
+            newPostDiv.setAttribute('data-index', newIndex);
+            
+            const defaultHours = cloneDefaultHours();
+            
+            newPostDiv.innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <label style="font-size: 14px; font-weight: 600; color: #495057; display: block; margin-bottom: 10px;">Post Name</label>
+                    <input type="text" class="guard-input post-name-input" value="New Post ${newIndex + 1}" 
+                            placeholder="Post Name" data-index="${newIndex}">
+                </div>
+
+                <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" class="post-hidden-input" id="hidden_${newIndex}">
+                    <label for="hidden_${newIndex}" style="font-size: 14px; color: #495057; cursor: pointer;">
+                        Hide this post from guards (Business visibility only)
+                    </label>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="font-size: 14px; font-weight: 600; color: #495057; display: block; margin-bottom: 10px;">Daily Schedule</label>
+                    <div style="background: white; border: 2px solid #dee2e6; border-radius: 6px; overflow: hidden;">
+                        <!-- Header Row -->
+                        <div style="display: grid; grid-template-columns: 110px 140px 140px 120px; gap: 10px; padding: 12px; border-bottom: 2px solid #495057; background: #e9ecef; font-weight: 600;">
+                            <div>Day</div>
+                            <div>Start Time</div>
+                            <div>End Time</div>
+                            <div style="text-align: center;">Active?</div>
+                        </div>
+                        ${defaultHours.map((dayHours, dayIndex) => `
+                            <div class="day-row ${dayHours.active ? 'active' : 'inactive'}">
+                                <strong style="color: #495057;">${dayHours.day}</strong>
+                                <input type="time" class="guard-input post-day-start" value="${dayHours.startTime}" 
+                                        data-post="${newIndex}" data-day="${dayIndex}" style="padding: 8px;">
+                                <input type="time" class="guard-input post-day-end" value="${dayHours.endTime}" 
+                                        data-post="${newIndex}" data-day="${dayIndex}" style="padding: 8px;">
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                    <input type="checkbox" ${dayHours.active ? 'checked' : ''}
+                                           data-post="${newIndex}" data-day="${dayIndex}" 
+                                           class="post-day-active"
+                                           onchange="toggleDayCheckboxChange(this, ${newIndex}, ${dayIndex})">
+                                    <span style="font-size: 12px; color: #6c757d; font-weight: 600;">${dayHours.active ? '✓ Yes' : '✗ No'}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <p style="font-size: 11px; color: #6c757d; margin-top: 5px;">
+                        <strong>Tip:</strong> Check the box to make the day active, uncheck to disable that day for this post.
+                    </p>
+                </div>
+                
+                <button class="btn btn-secondary" onclick="removePost(${newIndex})" style="width: 100%;">Remove Post</button>
+            `;
+            
+            const addButton = inputs.querySelector('button[onclick="addNewPost()"]');
+            inputs.insertBefore(newPostDiv, addButton);
+        }
+
+        function removePost(index) {
+            const postItems = document.querySelectorAll('.post-manager-item');
+            if (postItems.length <= 1) {
+                alert('You must have at least one post.');
+                return;
+            }
+            
+            const postNameInput = document.querySelector(`.post-name-input[data-index="${index}"]`);
+            const postName = postNameInput ? postNameInput.value : `Post at index ${index}`;
+            
+            if (confirm(`Remove ${postName}? This will clear all assignments for this post.`)) {
+                postItems[index].remove();
+            }
+        }
+
+        function toggleDayCheckbox(postIndex, dayIndex) {
+            const checkbox = document.querySelector(`.post-day-active[data-post="${postIndex}"][data-day="${dayIndex}"]`);
+            const row = checkbox.closest('.day-row');
+            const label = checkbox.nextElementSibling;
+            
+            if (checkbox) {
+                checkbox.checked = !checkbox.checked;
+                
+                if (checkbox.checked) {
+                    row.classList.add('active');
+                    row.classList.remove('inactive');
+                    if (label) label.textContent = 'Active';
+                } else {
+                    row.classList.remove('active');
+                    row.classList.add('inactive');
+                    if (label) label.textContent = 'Inactive';
+                }
+            }
+        }
+
+        function toggleDayCheckboxChange(checkbox, postIndex, dayIndex) {
+            const row = checkbox.closest('.day-row');
+            const label = checkbox.nextElementSibling;
+            
+            if (checkbox.checked) {
+                row.classList.add('active');
+                row.classList.remove('inactive');
+                if (label) label.textContent = '✓ Yes';
+            } else {
+                row.classList.remove('active');
+                row.classList.add('inactive');
+                if (label) label.textContent = '✗ No';
+            }
+        }
+
+        async function savePosts() {
+            const postItems = document.querySelectorAll('.post-manager-item');
+            const myNewPosts = [];
+            
+            postItems.forEach((item, index) => {
+                const nameInput = item.querySelector('.post-name-input');
+                const postName = nameInput ? nameInput.value.trim() : '';
+                const hiddenInput = item.querySelector('.post-hidden-input');
+                
+                if (!postName) return;
+                
+                const hours = [];
+                DAYS.forEach((day, dayIndex) => {
+                    const startInput = item.querySelector(`.post-day-start[data-post="${index}"][data-day="${dayIndex}"]`);
+                    const endInput = item.querySelector(`.post-day-end[data-post="${index}"][data-day="${dayIndex}"]`);
+                    const activeCheckbox = item.querySelector(`.post-day-active[data-post="${index}"][data-day="${dayIndex}"]`);
+                    
+                    hours.push({
+                        day: day,
+                        startTime: startInput ? startInput.value : '08:45',
+                        endTime: endInput ? endInput.value : '17:15',
+                        active: activeCheckbox ? activeCheckbox.checked : true
+                    });
+                });
+                
+                myNewPosts.push({
+                    name: postName,
+                    hours: hours,
+                    owner: userRole === 'business' ? currentUser : 'Bank of America',
+                    hiddenFromGuards: hiddenInput ? hiddenInput.checked : false
+                });
+            });
+            
+            if (myNewPosts.length < 1) {
+                alert('Please provide at least one post.');
+                return;
+            }
+            
+            if (userRole === 'business') {
+                const otherPosts = POSTS.filter(p => p.owner !== currentUser);
+                POSTS = [...otherPosts, ...myNewPosts];
+            } else {
+                POSTS = myNewPosts;
+            }
+            
+            await saveConfigToFirebase();
+            renderGuards();
+            renderSchedule();
+            updateStats();
+            closePostModal();
+            
+            alert('Posts updated successfully!');
+        }
+
+        function showHolidayManager() {
+            if (userRole !== 'admin') {
+                alert('Only administrators can manage holidays');
+                return;
+            }
+
+            const modal = document.getElementById('holidayModal');
+            const inputs = document.getElementById('holidayInputs');
+            
+            let html = '';
+            DAYS.forEach((day, index) => {
+                const hasHoliday = holidays[index];
+                html += `
+                    <div class="holiday-day-item ${hasHoliday ? 'has-holiday' : ''}" onclick="toggleHoliday(${index})">
+                        <strong>${day}</strong>
+                        ${hasHoliday ? `<div style="color: #fab005; margin-top: 5px;">🎉 ${holidays[index]}</div>` : 
+                                       '<div style="color: #6c757d; margin-top: 5px;">No holiday - click to add</div>'}
+                    </div>
+                `;
+            });
+            
+            inputs.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        async function toggleHoliday(dayIndex) {
+            const dayName = DAYS[dayIndex];
+            
+            if (holidays[dayIndex]) {
+                if (confirm(`Remove holiday "${holidays[dayIndex]}" from ${dayName}?`)) {
+                    delete holidays[dayIndex];
+                    await saveToFirebase();
+                    showHolidayManager();
+                    renderSchedule();
+                    updateStats();
+                }
+            } else {
+                const holidayName = prompt(`Enter holiday name for ${dayName}:`);
+                if (holidayName && holidayName.trim()) {
+                    POSTS.forEach(post => {
+                        const postName = typeof post === 'string' ? post : post.name;
+                        const key = `${postName}_${dayIndex}`;
+                        delete schedule[key];
+                    });
+                    
+                    guards.forEach(guard => {
+                        const vacationKey = `${guard}_${dayIndex}`;
+                        delete vacations[vacationKey];
+                    });
+                    
+                    holidays[dayIndex] = holidayName.trim();
+                    await saveToFirebase();
+                    showHolidayManager();
+                    renderSchedule();
+                    updateStats();
+                }
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('guardModal').classList.remove('active');
+        }
+
+        function closePostModal() {
+            document.getElementById('postModal').classList.remove('active');
+        }
+
+        function closeHolidayModal() {
+            document.getElementById('holidayModal').classList.remove('active');
+        }
+
+        function closeShiftModal() {
+            const modal = document.getElementById('shiftModal');
+            if (modal) {
+                modal.classList.remove('active');
+            }
+            shiftModalContext = null;
+        }
+
+        // Note: initializeApp() is called by Firebase module after successful initialization
+    </script>
+</body>
+</html>
